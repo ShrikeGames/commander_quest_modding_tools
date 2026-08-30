@@ -16,7 +16,7 @@
   {
    "namespace": "ST_Gears",
    "key": "ThreeLionFlag_Title",
-   "value": "Three Sheeps Flag",
+   "value": "Three Sheep Flag",
    "locale": "en"
   },
   {
@@ -36,6 +36,11 @@
    "texture_path": "Commander/Content/UI/ArtResources/Card/Commander/T_Image_Card_Commander_Dwarf_Richard",
    "image_path": "/home/shrike/.steam/debian-installation/steamapps/common/Commander Quest/commander_quest_modding_tools/mod_assets/images/DA_Card_Summon_Sheep_C1_T1_2_3.png",
    "source_texture": ""
+  },
+  {
+   "texture_path": "Commander/Content/UI/ArtResources/Gear/T_Icon_Gear_ThreeLionFlag",
+   "image_path": "/home/shrike/.steam/debian-installation/steamapps/common/Commander Quest/commander_quest_modding_tools/mod_assets/images/DA_Gear_ThreeSheepFlag.png",
+   "source_texture": ""
   }
  ],
  "values": [
@@ -44,6 +49,12 @@
    "offset": 16,
    "value": 1,
    "label": "SummonCount"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Gears/DA_Gear_ThreeLionFlag",
+   "offset": 6,
+   "value": 4,
+   "label": "TargetUnitClassBranch"
   }
  ],
  "tags": [
