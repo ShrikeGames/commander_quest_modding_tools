@@ -60,19 +60,39 @@ two:
 Exports are matched by class and ordinal rather than position, so a base card
 missing an export its variant has still lines up.
 
+## What it cannot compare
+
+Unversioned property data carries no type tags, so values are only positioned by
+which properties precede them. If an asset and its variant set *different*
+properties, every value after the first difference sits at a different offset and
+a byte-for-byte comparison would be pure noise.
+
+`compare` therefore refuses those export pairs and records them in
+`DiffResult.skipped`. Check `result.fully_comparable`: when it is False, some
+changes are invisible to the comparison rather than absent.
+
+This is common. Of 1,029 matched export pairs across the game, 792 have identical
+property sets and 237 do not, so 201 of the 281 card pairs are only partially
+comparable. Assassin is a good example: its base sets properties
+`[0,1,3,4,5,6,9,12,13,16,18,24]` and its upgrade sets
+`[0,1,3,4,6,9,12,13,16,18]`, so its card export cannot be diffed at all even
+though the upgrade visibly drops its cost from 2 to 1.
+
 ## How well it works
 
 Across all **281** base/variant pairs in the game:
 
 | candidates | pairs |
 |---|---|
-| 0 | 142 |
-| 1 | 87 |
-| 2 | 29 |
-| 3 | 12 |
-| 4 to 6 | 11 |
+| 0 | 213 |
+| 1 | 50 |
+| 2 | 13 |
+| 3 | 1 |
+| 4 to 6 | 4 |
 
-Median 0, mean 0.8, maximum 6. Some worked examples:
+Median 0, mean 0.3, maximum 6. The large zero bucket is mostly pairs whose
+interesting export was skipped as structurally different, not pairs where
+nothing changed. Some worked examples:
 
 | card | text | found |
 |---|---|---|

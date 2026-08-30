@@ -65,6 +65,68 @@ class FieldDiff:
                 self.value_a, self.offset_a)
 
 
+@dataclass
+class DiffResult:
+    """The outcome of comparing two assets.
+
+    Iterating or taking the length of this object gives the fields, so it can be
+    used wherever a plain list was before.
+
+    Attributes:
+        fields (list[FieldDiff]): Candidates, best ranked first.
+        compared (int): Export pairs that were safe to compare.
+        skipped (list[tuple[int, str]]): ``(export index, class)`` pairs skipped
+            because the two assets set different properties on that export, so
+            their values do not line up byte for byte.
+    """
+
+    fields: list
+    compared: int = 0
+    skipped: list = None
+
+    def __post_init__(self):
+        """Default the skipped list without sharing one instance across results."""
+        if self.skipped is None:
+            self.skipped = []
+
+    def __iter__(self):
+        """Iterate the candidate fields.
+
+        Returns:
+            Iterator[FieldDiff]: The fields, best first.
+        """
+        return iter(self.fields)
+
+    def __len__(self):
+        """Count the candidate fields.
+
+        Returns:
+            int: Number of fields.
+        """
+        return len(self.fields)
+
+    def __getitem__(self, i):
+        """Index into the candidate fields.
+
+        Args:
+            i (int | slice): Index or slice.
+
+        Returns:
+            FieldDiff | list[FieldDiff]: The selected field or fields.
+        """
+        return self.fields[i]
+
+    @property
+    def fully_comparable(self) -> bool:
+        """Whether every matched export could be compared.
+
+        Returns:
+            bool: False if any export was skipped, meaning the two assets differ
+            structurally and some changes are invisible to this comparison.
+        """
+        return not self.skipped
+
+
 def variant_name(name: str) -> str:
     """Return the upgraded counterpart of an asset name.
 
@@ -115,10 +177,21 @@ def compare(asset_a, payload_a: bytes, asset_b, payload_b: bytes,
             Recommended for interactive use.
 
     Returns:
-        list[FieldDiff]: Candidates, best first, with overlapping matches
-        collapsed to one representative each.
+        DiffResult: Candidates best first with overlapping matches collapsed,
+        plus a record of any export pairs that had to be skipped.
+
+    Note:
+        Exports are only compared when both assets set exactly the same property
+        indices. Unversioned property data has no type tags, so a property
+        present in one asset and absent in the other shifts every later value:
+        comparing at the same byte offsets would then produce pure noise. Around
+        a quarter of matched export pairs in this game differ this way, so a
+        result with a non-empty :attr:`DiffResult.skipped` is incomplete rather
+        than wrong.
     """
     out = []
+    skipped = []
+    compared = 0
     skip_a = _text_spans(payload_a, names_a) if names_a else []
     skip_b = _text_spans(payload_b, names_b) if names_b else []
 
@@ -146,6 +219,11 @@ def compare(asset_a, payload_a: bytes, asset_b, payload_b: bytes,
         if n >= len(cands):
             continue
         eb = cands[n]
+        # Values only line up when both sides set the same properties.
+        if list(ea.prop_indices) != list(eb.prop_indices):
+            skipped.append((ea.index, ea.class_name))
+            continue
+        compared += 1
         sa, sb = ea.start + ea.header_bytes, eb.start + eb.header_bytes
         span = min(ea.end - sa, eb.end - sb)
         for d in range(max(0, span - 3)):
@@ -160,7 +238,7 @@ def compare(asset_a, payload_a: bytes, asset_b, payload_b: bytes,
     out.sort(key=lambda f: f.rank)
     if only_plausible:
         out = [f for f in out if f.plausible]
-    return _dedupe(out)
+    return DiffResult(_dedupe(out), compared, skipped)
 
 
 def _dedupe(diffs: list) -> list:
