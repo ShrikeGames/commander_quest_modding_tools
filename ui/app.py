@@ -180,6 +180,11 @@ class MainWindow(QMainWindow):
         self.info = QLabel("Select an asset"); self.info.setWordWrap(True)
         self.info.setTextInteractionFlags(Qt.TextSelectableByMouse)
         lay.addWidget(self.info)
+        self.links_box = QGroupBox("Linked assets")
+        self.links_layout = QVBoxLayout(self.links_box)
+        self.links_layout.setContentsMargins(6, 6, 6, 6)
+        self.links_box.setVisible(False)
+        lay.addWidget(self.links_box)
         form = QFormLayout()
         self.title_edit = QLineEdit(); self.title_edit.setEnabled(False)
         self.desc_edit = QPlainTextEdit(); self.desc_edit.setEnabled(False)
@@ -504,7 +509,56 @@ class MainWindow(QMainWindow):
         self.only_cand.setEnabled(False)
         self.find_btn.setEnabled(bool(self._variant_of(a)))
         self._load_values(a)
+        self._load_links(a)
         self._load_art(a)
+
+    def _load_links(self, a):
+        """Offer buttons for the assets this one references.
+
+        A summon card names its unit through an object reference, and the unit
+        is where attack and health live, so following the link is quicker than
+        searching for the DA_Unit_* asset by hand.
+
+        Args:
+            a (cqmod.catalog.Asset): The selected asset.
+        """
+        while self.links_layout.count():
+            w = self.links_layout.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        found = []
+        if self.usmap and getattr(self, "_pkg", None):
+            index = {x.name: x for x in self.assets}
+            for prop, target in self.usmap.links(a, self._pkg, self._payload):
+                hit = index.get(target) or index.get(target.removesuffix("_C"))
+                if hit and hit.name != a.name:
+                    found.append((prop, hit))
+        seen = set()
+        for prop, hit in found:
+            if hit.name in seen:
+                continue
+            seen.add(hit.name)
+            b = QPushButton(f"{prop}:  {hit.title or hit.name}")
+            b.setToolTip(f"{hit.name}\n{hit.class_name}")
+            b.clicked.connect(lambda _, n=hit.name: self._goto_asset(n))
+            self.links_layout.addWidget(b)
+        self.links_box.setVisible(bool(seen))
+
+    def _goto_asset(self, name):
+        """Select another asset by name, widening the filter if needed.
+
+        Args:
+            name (str): Asset name to jump to.
+        """
+        if not any(x.name == name for x in self.filtered):
+            self.classes.setCurrentRow(0)
+            self.search.setText(name)
+            self._refilter()
+        for row, x in enumerate(self.filtered):
+            if x.name == name:
+                self.table.selectRow(row)
+                self.table.scrollToItem(self.table.item(row, 0))
+                return
 
     def _load_art(self, a):
         """Show an asset's art, or why it cannot be shown.
@@ -553,9 +607,10 @@ class MainWindow(QMainWindow):
             self._payload = b""
 
         try:
-            self._names = uasset.parse(self.reader.read(a.uasset)).names
+            self._pkg = uasset.parse(self.reader.read(a.uasset))
+            self._names = self._pkg.names
         except Exception:
-            self._names = []
+            self._pkg, self._names = None, []
 
         named = bool(self.usmap) and not self.raw_mode.isChecked()
         rows = []

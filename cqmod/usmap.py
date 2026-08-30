@@ -164,6 +164,37 @@ class Usmap:
         e = self.data.get(class_name)
         return e["properties"] if e else []
 
+    def links(self, asset, package, payload: bytes) -> list:
+        """Find the other assets an asset points at.
+
+        Object and class properties serialize as an ``FPackageIndex``: negative
+        values index the import table, which names the referenced object. A
+        summon card reaches its unit this way, so following the link saves
+        hunting for ``DA_Unit_*`` by hand.
+
+        Args:
+            asset (cqmod.catalog.Asset): The asset being inspected.
+            package (cqmod.uasset.Package): Its parsed header.
+            payload (bytes): Its ``.uexp``.
+
+        Returns:
+            list[tuple[str, str]]: ``(property name, referenced object name)``
+            for every resolvable reference, in property order.
+        """
+        out = []
+        for e in asset.exports:
+            for f in self.place(e, payload):
+                if f.type not in ("ObjectProperty", "ClassProperty"):
+                    continue
+                if f.value is None or f.value >= 0:
+                    continue
+                i = -f.value - 1
+                if i < len(package.imports):
+                    target = package.imports[i].object_name
+                    if target and not target.startswith("/"):
+                        out.append((f.name, target))
+        return out
+
     @staticmethod
     def collect_tags(reader, assets) -> list:
         """Gather every gameplay tag name used anywhere in the game.

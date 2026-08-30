@@ -167,6 +167,34 @@ apostrophe in its name, so its package name string is UTF-16 with a negative
 length. Stepping over it as though the length were positive walked backwards
 through the file.
 
+## Linked assets
+
+Object and class properties serialize as an `FPackageIndex`, and a negative one
+indexes the import table, which names what it points at. The editor resolves
+those and offers a button per reference, so a summon card takes one click to
+reach the `DA_Unit_*` asset holding its attack and health rather than a search.
+
+```
+DA_Card_Summon_Human_Assassin
+   summonUnit -> BP_Unit_Assassin_C
+   UnitData   -> DA_Unit_Human_Assassin      (MaxHealth 2, AttackDamage 6)
+   ShapeClass -> BP_CardUseShape_Point_C
+```
+
+334 of 406 summon cards resolve their unit this way. The rest reference it
+through a property that placement cannot reach yet.
+
+## Not every unit has tags
+
+155 of 325 units carry a `Tags` property and 170 do not, which is correct rather
+than a gap in placement. Unversioned serialization omits any property left at
+its default, so a unit with no tags has no entry at all.
+
+The consequence is that a tag cannot currently be *added* to a unit that has
+none: that means inserting an index into the export's unversioned header and
+widening its payload, which changes the export's `SerialSize`. The name table
+work shows that kind of surgery is tractable, but it is not implemented.
+
 ## What is still not named
 
 Placement stops at the first variable-length property it cannot measure, so on a

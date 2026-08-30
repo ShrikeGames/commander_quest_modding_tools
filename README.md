@@ -16,6 +16,7 @@ loads at startup.
 | **Edit art** | Replace card art with any PNG (auto-scaled and centre-cropped) |
 | **Edit values** | Overwrite integers in export payloads by offset |
 | **Named properties** | Real property names and types, recovered from the running game |
+| **Follow links** | Jump from a summon card to the unit holding its stats |
 | **Find fields** | Diff a card against its `+` upgrade variant to locate gameplay numbers |
 | **Build** | Compile staged edits into `ZZZ_<name>_P.pak` and install it |
 | **Manage mods** | List installed mods and enable or disable each one |
@@ -85,6 +86,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
 | [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
 | [Property names](docs/property-names.md) | Recovering the real schema from the running game |
+| [Unit graphics](docs/unit-graphics.md) | How units are drawn, and what replacing them would take |
 | [Architecture](docs/architecture.md) | Module map and data flow |
 | [Limitations](docs/limitations.md) | What these tools cannot do, and why |
 | [Reverse engineering notes](docs/reverse-engineering.md) | How the format was worked out |

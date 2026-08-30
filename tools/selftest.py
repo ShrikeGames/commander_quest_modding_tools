@@ -247,6 +247,26 @@ def main():
     zero_seen = any(e.zero_indices for a in assets for e in a.exports)
     check("zero-valued properties are decoded from the header bitmap", zero_seen)
 
+    print("\nasset links:")
+    card = by.get("DA_Card_Summon_Human_Assassin")
+    if card and um:
+        cpkg = uasset.parse(r.read(card.uasset))
+        links = dict(um.links(card, cpkg, r.read(card.uexp)))
+        check("a summon card links to its unit",
+              links.get("UnitData") == "DA_Unit_Human_Assassin", str(links))
+        linked = 0
+        summons = [x for x in assets if x.class_name == "CMCardData_Summon"]
+        names = {x.name for x in assets}
+        for x in summons:
+            try:
+                lk = dict(um.links(x, uasset.parse(r.read(x.uasset)), r.read(x.uexp)))
+            except Exception:
+                continue
+            if lk.get("UnitData") in names:
+                linked += 1
+        check("most summon cards resolve their unit", linked > len(summons) * 0.8,
+              f"{linked}/{len(summons)}")
+
     print("\nname table insertion:")
     data_assets = [p for p in r.files()
                    if p.endswith(".uasset") and p.startswith("Commander/Content/Data/")]
