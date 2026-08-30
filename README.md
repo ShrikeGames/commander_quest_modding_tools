@@ -17,6 +17,7 @@ loads at startup.
 | **Edit values** | Overwrite integers in export payloads by offset |
 | **Find fields** | Diff a card against its `+` upgrade variant to locate gameplay numbers |
 | **Build** | Compile staged edits into `ZZZ_<name>_P.pak` and install it |
+| **Manage mods** | List installed mods and enable or disable each one |
 
 Asset classes indexed include `CMCardData_*` (666 cards), `CMUnitData` (325 units),
 `CMGearDefinition` (151 gear), `CMCommanderData` (5 commanders), quests, events and more.
@@ -34,7 +35,8 @@ specific to your copy:
 ```json
 {
   "game_dir": "/path/to/steamapps/common/Commander Quest",
-  "aes_key": "…64 hex chars…"
+  "aes_key": "…64 hex chars…",
+  "mods_dir": "/optional/path/for/disabled/mods"
 }
 ```
 
@@ -57,8 +59,10 @@ python3 ui/app.py          # the GUI
 python3 tools/selftest.py  # 16 end-to-end checks against the real pak
 ```
 
-Pick an asset, edit it, and press **Build & Install Mod**. Restart the game to load it.
-To uninstall, delete the `ZZZ_*_P.pak` from `Commander/Content/Paks/`.
+Pick an asset, edit it, and press **Build & Install Mod**. Restart the game to
+load it. The **Mods** tab lists every installed mod with a checkbox to enable or
+disable it: enabled mods live in the game's pak folder, disabled ones are held in
+a staging folder, and toggling moves the file between the two.
 
 ### Finding the number you want to change
 
@@ -78,6 +82,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [Getting started](docs/getting-started.md) | Install, configure, recover the key, build a first mod |
 | [GUI guide](docs/gui-guide.md) | The editor, tab by tab |
 | [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
+| [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
 | [Architecture](docs/architecture.md) | Module map and data flow |
 | [Limitations](docs/limitations.md) | What these tools cannot do, and why |
 | [Reverse engineering notes](docs/reverse-engineering.md) | How the format was worked out |
@@ -98,6 +103,7 @@ cqmod/
   catalog.py      the asset index
   diff.py         variant comparison / field finder
   project.py      staged edits -> a mod pak
+  mods.py         enable / disable installed mods
 third_party/ooz/  vendored Oodle Kraken decompressor (GPL-3.0)
 ```
 

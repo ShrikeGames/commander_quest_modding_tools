@@ -10,6 +10,7 @@ game data.
 | [Getting started](getting-started.md) | Install, configure, recover the pak key, build a first mod |
 | [GUI guide](gui-guide.md) | The editor, tab by tab |
 | [Finding fields](finding-fields.md) | How to locate the number you actually want to change |
+| [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
 | [Limitations](limitations.md) | What these tools cannot do, and why |
 
 ## Reference

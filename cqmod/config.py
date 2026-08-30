@@ -89,6 +89,22 @@ def paks_dir() -> Path:
     return game_dir() / "Commander/Content/Paks"
 
 
+def mods_dir() -> Path:
+    """Locate the staging folder holding disabled mods.
+
+    Staging lives outside the game directory by default so that mods survive a
+    Steam file verification, which may remove unrecognised files from the pak
+    folder.
+
+    Returns:
+        Path: The configured staging directory, defaulting to ``mods/`` beside
+        the repository root. The directory is not created here.
+    """
+    cfg = _load_local()
+    p = os.environ.get("CQMOD_MODS_DIR") or cfg.get("mods_dir")
+    return Path(p) if p else REPO_ROOT / "mods"
+
+
 def aes_key() -> bytes:
     """Load the pak index decryption key.
 

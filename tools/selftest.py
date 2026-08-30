@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -140,6 +140,54 @@ def main():
           ml.get("ST_Card_Supply", "Insight_Title") == "Pot of Greed")
     m.close(); Path(tmp).unlink()
     r.close()
+
+    print("\nmod manager:")
+    with tempfile.TemporaryDirectory() as td:
+        live, stage = Path(td) / "Paks", Path(td) / "staging"
+        live.mkdir(); stage.mkdir()
+        base = live / "Commander-Windows.pak"
+        base.write_bytes(build_pak([("Commander/Content/base.txt", b"base")]))
+        (live / "ZZZ_Demo_P.pak").write_bytes(
+            build_pak([("Commander/Content/a.uexp", b"demo")]))
+        mgr = mods.ModManager(live, stage, base)
+
+        found = mgr.list()
+        check("base game archive is excluded from the mod list",
+              [m.filename for m in found] == ["ZZZ_Demo_P.pak"],
+              str([m.filename for m in found]))
+        check("mod reports its asset count", found[0].file_count == 1)
+        check("display name strips prefix and suffix", found[0].name == "Demo",
+              found[0].name)
+
+        mgr.disable(found[0])
+        check("disabling moves the pak out of the live folder",
+              not (live / "ZZZ_Demo_P.pak").exists()
+              and (stage / "ZZZ_Demo_P.pak").exists())
+        check("a disabled mod is still listed",
+              [(m.name, m.enabled) for m in mgr.list()] == [("Demo", False)])
+
+        mgr.enable(mgr.list()[0])
+        check("enabling moves it back",
+              (live / "ZZZ_Demo_P.pak").exists()
+              and not (stage / "ZZZ_Demo_P.pak").exists())
+
+        try:
+            mgr.disable(mods.ModInfo(base.name, "base", base, True, 0,
+                                     found[0].modified))
+            protected = False
+        except mods.ModError:
+            protected = True
+        check("base game archive cannot be moved", protected)
+        check("base game archive still present", base.exists())
+
+        junk = Path(td) / "not-a-pak.pak"
+        junk.write_bytes(b"nonsense")
+        try:
+            mgr.import_pak(junk)
+            rejected = False
+        except mods.ModError:
+            rejected = True
+        check("importing a non-pak is rejected", rejected)
 
     print(f"\n{passed} passed, {failed} failed")
     return 1 if failed else 0

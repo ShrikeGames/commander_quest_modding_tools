@@ -6,8 +6,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from PySide6.QtCore import Qt, QSize, QThread, Signal
-from PySide6.QtGui import QAction, QImage, QPixmap, QKeySequence, QColor
+from PySide6.QtCore import Qt, QSize, QThread, QUrl, Signal
+from PySide6.QtGui import (QAction, QDesktopServices, QImage, QPixmap,
+                           QKeySequence, QColor)
 from PySide6.QtWidgets import (
     QCheckBox, QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QLineEdit,
@@ -16,7 +17,10 @@ from PySide6.QtWidgets import (
     QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy,
 )
 
-from cqmod import config, catalog, texture, locres, uasset, diff
+from datetime import datetime
+
+from cqmod import config, catalog, texture, locres, uasset, diff, mods
+from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
 
@@ -64,6 +68,7 @@ class MainWindow(QMainWindow):
         self.current: catalog.Asset | None = None
         self.project = Project()
         self.project_path: Path | None = None
+        self.mods = ModManager(config.paks_dir(), config.mods_dir(), config.pak_path())
         self._payload = b""
 
         self._build_ui()
@@ -116,7 +121,13 @@ class MainWindow(QMainWindow):
 
         split.addWidget(self._detail_panel())
         split.setSizes([230, 460, 760])
-        self.setCentralWidget(split)
+
+        self.main_tabs = QTabWidget()
+        self.main_tabs.addTab(split, "Edit assets")
+        self.main_tabs.addTab(self._mods_panel(), "Mods")
+        self.main_tabs.currentChanged.connect(
+            lambda i: self._refresh_mods() if i == 1 else None)
+        self.setCentralWidget(self.main_tabs)
         self.setStatusBar(QStatusBar())
 
     @staticmethod
@@ -217,6 +228,158 @@ class MainWindow(QMainWindow):
         row.addWidget(b); row.addStretch(); lay.addLayout(row)
         self.tabs.addTab(page, "Pending edits")
         return self.tabs
+
+    def _mods_panel(self):
+        """Build the mod manager tab.
+
+        Returns:
+            QWidget: A table of installed mods over a row of actions.
+        """
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.addWidget(QLabel(
+            "The game loads every pak in its Paks folder, so a mod is <b>enabled</b> "
+            "when its file lives there and <b>disabled</b> when it is held in the "
+            "staging folder. Toggling moves the file between the two."))
+
+        self.mods_table = QTableWidget(0, 6)
+        self.mods_table.setHorizontalHeaderLabels(
+            ["Enabled", "Mod", "Assets", "Size", "Built", "File"])
+        self.mods_table.verticalHeader().setVisible(False)
+        self.mods_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.mods_table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.mods_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.mods_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.mods_table.itemChanged.connect(self._mod_toggled)
+        lay.addWidget(self.mods_table)
+
+        self.mods_hint = QLabel("")
+        self.mods_hint.setWordWrap(True)
+        lay.addWidget(self.mods_hint)
+
+        row = QHBoxLayout()
+        for text, slot in (("Refresh", self._refresh_mods),
+                           ("Import pak...", self._import_mod),
+                           ("Delete", self._delete_mod),
+                           ("Open staging folder", self._open_staging)):
+            b = QPushButton(text)
+            b.clicked.connect(slot)
+            row.addWidget(b)
+        row.addStretch()
+        lay.addLayout(row)
+        return page
+
+    def _refresh_mods(self):
+        """Rescan both directories and repopulate the mod table."""
+        try:
+            found = self.mods.list()
+        except Exception as e:
+            self.mods_hint.setText(f"Could not list mods: {e}")
+            return
+        self._mod_rows = found
+        t = self.mods_table
+        t.blockSignals(True)
+        t.setRowCount(len(found))
+        for r, m in enumerate(found):
+            chk = QTableWidgetItem()
+            chk.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            chk.setCheckState(Qt.Checked if m.enabled else Qt.Unchecked)
+            chk.setData(Qt.UserRole, r)
+            t.setItem(r, 0, chk)
+            cells = [m.name,
+                     "-" if m.file_count is None else str(m.file_count),
+                     f"{m.size:,}",
+                     m.modified.strftime("%Y-%m-%d %H:%M"),
+                     m.filename]
+            for c, text in enumerate(cells, start=1):
+                it = QTableWidgetItem(text)
+                it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                if m.error:
+                    it.setForeground(QColor("#b04a4a"))
+                t.setItem(r, c, it)
+        t.resizeColumnsToContents()
+        t.blockSignals(False)
+
+        problems = [m for m in found if m.error or not m.is_patch_pak]
+        if problems:
+            bits = []
+            for m in problems:
+                if m.error:
+                    bits.append(f"{m.filename} could not be read ({m.error})")
+                else:
+                    bits.append(f"{m.filename} does not end in _P.pak, so it will not "
+                                "override base game assets")
+            self.mods_hint.setText("Warning: " + "; ".join(bits))
+        else:
+            n = sum(1 for m in found if m.enabled)
+            self.mods_hint.setText(
+                f"{len(found)} mod(s), {n} enabled. Restart the game after changing this."
+                if found else
+                f"No mods yet. Build one from the Edit assets tab, or import a pak. "
+                f"Staging folder: {self.mods.staging_dir}")
+
+    def _mod_toggled(self, item):
+        """Enable or disable a mod when its checkbox changes.
+
+        Args:
+            item (QTableWidgetItem): The checkbox cell that changed.
+        """
+        if item.column() != 0:
+            return
+        mod = self._mod_rows[item.data(Qt.UserRole)]
+        want = item.checkState() == Qt.Checked
+        if want == mod.enabled:
+            return
+        try:
+            self.mods.set_enabled(mod, want)
+        except ModError as e:
+            QMessageBox.warning(self, "Could not change mod state", str(e))
+        self._refresh_mods()
+        self.statusBar().showMessage(
+            f"{mod.name} {'enabled' if want else 'disabled'}; restart the game", 8000)
+
+    def _selected_mod(self):
+        """The mod highlighted in the table.
+
+        Returns:
+            ModInfo | None: The selection, or None if nothing is selected.
+        """
+        rows = self.mods_table.selectionModel().selectedRows()
+        return self._mod_rows[rows[0].row()] if rows else None
+
+    def _import_mod(self):
+        """Copy an external pak into staging after validating it."""
+        p, _ = QFileDialog.getOpenFileName(self, "Import a mod pak", "", "Pak (*.pak)")
+        if not p:
+            return
+        try:
+            m = self.mods.import_pak(p)
+        except ModError as e:
+            QMessageBox.warning(self, "Import failed", str(e))
+            return
+        self._refresh_mods()
+        self.statusBar().showMessage(f"imported {m.filename} (disabled)", 8000)
+
+    def _delete_mod(self):
+        """Permanently delete the selected mod after confirmation."""
+        mod = self._selected_mod()
+        if not mod:
+            QMessageBox.information(self, "No mod selected", "Select a mod first.")
+            return
+        if QMessageBox.question(
+                self, "Delete mod",
+                f"Permanently delete {mod.filename}?\n\n{mod.path}") != QMessageBox.Yes:
+            return
+        try:
+            self.mods.delete(mod)
+        except ModError as e:
+            QMessageBox.warning(self, "Delete failed", str(e))
+        self._refresh_mods()
+
+    def _open_staging(self):
+        """Open the staging folder in the desktop file manager."""
+        self.mods.staging_dir.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.mods.staging_dir)))
 
     # ------------------------------------------------------------- load
     def _start_load(self):
@@ -546,15 +709,28 @@ class MainWindow(QMainWindow):
             return
         log = []
         try:
-            out = self.project.install(self.reader, config.paks_dir(), log=log.append)
+            raw = self.project.build(self.reader, log=log.append)
+            dest = self.mods.staging_path_for(self.project.name)
+            # Rebuilding replaces any previous copy in either directory.
+            for old in (dest, self.mods.paks_dir / dest.name):
+                if old.exists():
+                    old.unlink()
+            dest.write_bytes(raw)
+            log.append(f"wrote {dest.name} ({len(raw):,} bytes)")
+            st = dest.stat()
+            info = ModInfo(dest.name, display_name(dest.name), dest, False,
+                           st.st_size, datetime.fromtimestamp(st.st_mtime))
+            self.mods.enable(info)
+            log.append(f"enabled: {info.path}")
         except Exception as e:
             QMessageBox.critical(self, "Build failed",
                                  f"{e}\n\n" + "\n".join(log))
             return
+        self._refresh_mods()
         QMessageBox.information(
             self, "Mod installed",
-            "\n".join(log) + f"\n\nRestart the game to load it.\n"
-            f"To uninstall, delete:\n{out}")
+            "\n".join(log) + "\n\nRestart the game to load it.\n"
+            "Use the Mods tab to disable it without deleting it.")
 
 
 def main():

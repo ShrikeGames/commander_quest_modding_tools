@@ -26,13 +26,15 @@ gitignored, because it holds a key specific to your copy of the game.
 ```json
 {
   "game_dir": "/path/to/steamapps/common/Commander Quest",
-  "aes_key": "…64 hex characters…"
+  "aes_key": "…64 hex characters…",
+  "mods_dir": "/optional/path/for/disabled/mods"
 }
 ```
 
 `game_dir` defaults to the repository's parent, so if you cloned into the game
-folder you can leave it out. Both settings can also come from the environment,
-as `CQMOD_GAME_DIR` and `CQMOD_AES_KEY`.
+folder you can leave it out. `mods_dir` defaults to `mods/` beside the
+repository root. All three can also come from the environment, as
+`CQMOD_GAME_DIR`, `CQMOD_AES_KEY` and `CQMOD_MODS_DIR`.
 
 ## Recovering the pak key
 
@@ -84,8 +86,10 @@ python3 ui/app.py
 4. Type a new value into the **New value** column.
 5. Press **Build & Install Mod** and restart the game.
 
-To uninstall, delete the `ZZZ_*_P.pak` from `Commander/Content/Paks/`. Nothing
-else on disk is ever modified, and the base archive is only ever read.
+The mod is written to the staging folder and enabled. Use the **Mods** tab to
+turn it off again without deleting it, or to remove it entirely. See
+[mod manager](mod-manager.md). Nothing else on disk is ever modified, and the
+base archive is only ever read.
 
 ## A note on Steam
 

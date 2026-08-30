@@ -7,6 +7,9 @@ python3 ui/app.py
 The archive is opened and indexed on a background thread; the window is usable
 after roughly a fifth of a second.
 
+The window has two top-level tabs: **Edit assets**, described below, and
+**Mods**, covered in [mod manager](mod-manager.md).
+
 ## Layout
 
 **Left: asset type.** Every class found in the archive, with counts.
@@ -64,12 +67,17 @@ Staged rows are highlighted in the accent colour.
 Every staged change as a plain list, with a count on the tab label. *Clear all
 edits* discards them.
 
+## Mods tab
+
+Lists every mod in the live and staging folders, with a checkbox to enable or
+disable each one. See [mod manager](mod-manager.md).
+
 ## Toolbar
 
 - **Open / Save Project**. Projects are small readable JSON files listing the
   staged edits, so a mod can be kept under version control and rebuilt later.
-- **Build & Install Mod**. Compiles everything into
-  `ZZZ_<name>_P.pak` in the game's `Content/Paks`, and reports what was written.
+- **Build & Install Mod**. Compiles everything into `ZZZ_<name>_P.pak`, writes
+  it to the staging folder, enables it, and reports what was written.
 
-Restart the game to load a mod. To uninstall, delete that one file. Nothing else
-is ever modified.
+Restart the game to load a mod. To turn one off, untick it on the Mods tab;
+to remove it entirely, delete it there. Nothing else on disk is ever modified.

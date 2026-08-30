@@ -6,6 +6,7 @@
 ui/app.py            PySide6 editor
       |
 cqmod/project.py     staged edits  ->  a mod pak
+cqmod/mods.py        enable / disable installed mods
 cqmod/catalog.py     the asset index
 cqmod/diff.py        variant comparison / field finder
       |
