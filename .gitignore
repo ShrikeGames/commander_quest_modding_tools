@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local machine config: game path + pak AES key (never commit)
+cqmod_config.local.json
+
+# Built decoder and generated sources
+third_party/ooz/libooz.so
+third_party/ooz/*_lib.cpp
+
+# Build output
+build/
+dist_paks/
+
+tools/aes_finder/aes_finder
