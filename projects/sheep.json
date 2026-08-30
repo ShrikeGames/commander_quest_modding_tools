@@ -1,13 +1,37 @@
 {
- "name": "MyMod",
- "texts": [],
- "textures": [],
+ "name": "Sheep",
+ "texts": [
+  {
+   "namespace": "ST_Commander",
+   "key": "Human_Richard_Title",
+   "value": "Richard the Shepard",
+   "locale": "en"
+  },
+  {
+   "namespace": "ST_Commander",
+   "key": "Richard_Outgame_Desc",
+   "value": "\"After all, sheep think that they are smart.\"",
+   "locale": "en"
+  }
+ ],
+ "textures": [
+  {
+   "texture_path": "Commander/Content/UI/ArtResources/Card/Commander/T_Image_Card_Commander_Human_Richard",
+   "image_path": "/home/shrike/.steam/debian-installation/steamapps/common/Commander Quest/commander_quest_modding_tools/mod_assets/images/DA_Card_Summon_Sheep_C1_T1_2_3.png",
+   "source_texture": ""
+  },
+  {
+   "texture_path": "Commander/Content/UI/ArtResources/Card/Commander/T_Image_Card_Commander_Dwarf_Richard",
+   "image_path": "/home/shrike/.steam/debian-installation/steamapps/common/Commander Quest/commander_quest_modding_tools/mod_assets/images/DA_Card_Summon_Sheep_C1_T1_2_3.png",
+   "source_texture": ""
+  }
+ ],
  "values": [
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Sheep",
-   "offset": 71,
+   "asset_path": "Commander/Content/Data/Cards/SummonCards/DA_Card_Summon_Sheep",
+   "offset": 16,
    "value": 1,
-   "label": "DA_Unit_Sheep@71"
+   "label": "SummonCount"
   }
  ],
  "tags": [
@@ -105,6 +129,20 @@
    "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
    "offset": 656,
    "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 327,
+   "tag": "Summon_Sheep"
+  }
+ ],
+ "added": [
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Sheep",
+   "export_index": 2,
+   "prop_index": 6,
+   "value": 1,
+   "label": "AttackDamage"
   }
  ]
 }

@@ -94,6 +94,24 @@ stops lining up with the pak fails loudly.
 `PileLocation` showing as `zero` is the header bitmap in action: a zero-valued
 property is a bit in the header and occupies no bytes.
 
+## Object references are read only
+
+An object or class property serializes as a package index, so typing a different
+number into one does not change a value: it repoints the reference at whatever
+else sits at that index. That fails quietly. Setting a unit's `AttackType` to 1
+aims it at a VFX export instead of its attack type, leaving the unit with no
+attack, so any `AttackDamage` on it does nothing.
+
+References are therefore shown resolved and read only:
+
+```
+AttackType          ObjectProperty   -> CMUnitAttackType_MeleeTarget
+BehaviorTreeAsset   ObjectProperty   -> BT_MinionAIBehaviorTree
+```
+
+Only plain integers can be typed. Repointing a reference safely needs the same
+import table work that swapping a unit's mesh does.
+
 ## Where the stats actually live
 
 Unit attack and health are **not on the card**. A summon card points at a
@@ -105,8 +123,15 @@ DA_Unit_Human_Cataphract       AttackDamage 4    MaxHealth 13
 DA_Unit_Human_GrowingSquire    AttackDamage 3    MaxHealth 7
 ```
 
-Both match the collection screen exactly, and the self-test asserts it. Select
-the unit asset rather than the card to edit them.
+Both match the collection screen exactly, and the self-test asserts it. The
+editor lists a linked asset's properties alongside the card's own, prefixed with
+the asset they belong to, so a summon card's health and attack can be edited
+without going to find the unit.
+
+Base, enhanced and enemy units are **separate assets** with independent stats:
+`DA_Unit_Human_GrowingSquire` is 7 health and 3 attack while
+`DA_Unit_Human_GrowingSquire+` is 8 and 4. Editing one does not affect the
+others, which is a common reason a change appears to do nothing in game.
 
 Reaching `MaxHealth` needs one extra step, because it sits at index 1 right
 after `Tags`, a `StructProperty` whose size no type table can give.

@@ -93,14 +93,27 @@ class Field:
 
     @property
     def editable(self) -> bool:
-        """Whether this field can be changed with a value edit.
+        """Whether this field is safe to change by typing a number.
+
+        Object and class properties are deliberately excluded. They serialize as
+        a package index, so a hand-typed number silently repoints the reference
+        at whatever else happens to sit at that index rather than changing a
+        value. Getting one wrong breaks the asset quietly: pointing a unit's
+        AttackType at a VFX export leaves it with no attack at all.
 
         Returns:
-            bool: True for inline 4-byte integers, which is what
-            :class:`cqmod.project.ValueEdit` can write.
+            bool: True only for plain numbers a user can meaningfully type.
         """
-        return self.size == 4 and self.type in ("IntProperty", "FloatProperty",
-                                                "ObjectProperty", "ClassProperty")
+        return self.size == 4 and self.type == "IntProperty"
+
+    @property
+    def is_reference(self) -> bool:
+        """Whether this field points at another object rather than holding a value.
+
+        Returns:
+            bool: True for object and class properties.
+        """
+        return self.type in ("ObjectProperty", "ClassProperty", "SoftObjectProperty")
 
 
 class Usmap:

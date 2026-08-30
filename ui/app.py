@@ -786,21 +786,27 @@ class MainWindow(QMainWindow):
             self.art.setText(f"cannot display art:\n{e}"); self.art.setWordWrap(True)
 
     def _load_values(self, a):
-        """Show the asset's property values.
+        """Show the asset's property values, and those of what it links to.
 
-        With the recovered schema each row is a named property placed at its
-        real offset. Without it, or in raw mode, the table falls back to listing
-        every byte offset interpreted as an integer, stepping one byte at a time
-        because property layouts interleave sizes and a four-byte stride skips
-        real fields.
+        A card carries no stats of its own: a summon card's health and attack
+        live on the ``DA_Unit_*`` asset it points at. Those are listed here too,
+        marked with the asset they belong to, so the numbers shown on a card can
+        be edited without going to find the unit.
+
+        With the recovered schema each row is a named property at its real
+        offset. Without it, or in raw mode, the table falls back to every byte
+        offset read as an integer, stepping one byte at a time because property
+        layouts interleave sizes.
 
         Args:
             a (cqmod.catalog.Asset): The selected asset.
         """
         self.values.blockSignals(True)
         self.values.setRowCount(0)
+        self._payloads = {}
         try:
             self._payload = self.reader.read(a.uexp)
+            self._payloads[a.path] = self._payload
         except Exception:
             self._payload = b""
 
@@ -812,40 +818,94 @@ class MainWindow(QMainWindow):
 
         named = bool(self.usmap) and not self.raw_mode.isChecked()
         rows = []
-        if named:
-            for n, e in enumerate(a.exports):
-                placed = self.usmap.place(e, self._payload)
+
+        pkg_cache = {}
+
+        def pkg_of(asset):
+            """Parse and cache an asset's header, for resolving references.
+
+            Args:
+                asset (cqmod.catalog.Asset): The asset.
+
+            Returns:
+                cqmod.uasset.Package | None: Its header, or None if unreadable.
+            """
+            if asset.path not in pkg_cache:
+                try:
+                    pkg_cache[asset.path] = uasset.parse(self.reader.read(asset.uasset))
+                except Exception:
+                    pkg_cache[asset.path] = None
+            return pkg_cache[asset.path]
+
+        def add_asset_rows(asset, payload, owned):
+            """Append one asset's property rows.
+
+            Args:
+                asset (cqmod.catalog.Asset): Asset to list.
+                payload (bytes): Its ``.uexp``.
+                owned (bool): False when the asset is only linked to, which
+                    labels its rows and stages edits against its own path.
+            """
+            for n, e in enumerate(asset.exports):
+                placed = self.usmap.place(e, payload)
+                prefix = "" if owned else f"{asset.name}  "
                 for f in placed:
-                    rows.append((e.index, f.name, f.type, f.offset, f.value,
-                                 f.editable, None, None))
+                    shown = f.value
+                    if f.is_reference and f.value is not None:
+                        # Show what a reference points at; the raw index means
+                        # nothing to a reader and inviting edits to it is unsafe.
+                        target = pkg_of(asset).resolve(f.value) if pkg_of(asset) else ""
+                        shown = f"-> {target}" if target else f.value
+                    rows.append(dict(ex=e.index, name=prefix + f.name, type=f.type,
+                                     off=f.offset, val=shown, editable=f.editable,
+                                     tag=None, add=None, path=asset.path, owned=owned))
                     if self.usmap.is_tag_container(e, f.index):
-                        for k, (off, nidx) in enumerate(
-                                self.usmap.tags(f, self._payload)):
-                            label = (self._names[nidx] if nidx < len(self._names)
-                                     else f"<name {nidx}>")
-                            rows.append((e.index, f"    tag[{k}]", "GameplayTag",
-                                         off, label, False, nidx, None))
-                # Properties the export leaves at their default do not appear in
-                # the payload at all, so offer them as additions.
+                        for k, (off, nidx) in enumerate(self.usmap.tags(f, payload)):
+                            nm = self._names[nidx] if owned and nidx < len(self._names) \
+                                else f"<name {nidx}>"
+                            rows.append(dict(ex=e.index, name=f"    tag[{k}]",
+                                             type="GameplayTag", off=off, val=nm,
+                                             editable=False, tag=nidx, add=None,
+                                             path=asset.path, owned=owned))
                 if len(placed) == len(e.prop_indices):
                     have = set(e.prop_indices)
                     for q in self.usmap.properties(e.class_name):
-                        if q["index"] in have:
+                        if q["index"] in have or q["type"] not in usmap.SERIALIZED_SIZE:
                             continue
-                        if q["type"] not in usmap.SERIALIZED_SIZE:
-                            continue
-                        rows.append((e.index, q["name"], q["type"], -2, None,
-                                     True, None, (n, q["index"])))
+                        if q["type"] in ("ObjectProperty", "ClassProperty",
+                                         "SoftObjectProperty"):
+                            continue        # a reference cannot be typed in
+                        rows.append(dict(ex=e.index, name=prefix + q["name"],
+                                         type=q["type"], off=-2, val=None,
+                                         editable=True, tag=None,
+                                         add=(n, q["index"]), path=asset.path,
+                                         owned=owned))
 
+        if named:
+            add_asset_rows(a, self._payload, True)
+            for _, target in self.usmap.links(a, self._pkg, self._payload) \
+                    if self._pkg else []:
+                linked = next((x for x in self.assets if x.name == target), None)
+                if linked is None or linked.name == a.name or not linked.exports:
+                    continue
+                try:
+                    lp = self.reader.read(linked.uexp)
+                except Exception:
+                    continue
+                self._payloads[linked.path] = lp
+                add_asset_rows(linked, lp, False)
             if not rows:
                 named = False
+
         if not named:
             for e in a.exports:
                 start = e.start + e.header_bytes
                 end = min(e.end, len(self._payload))
                 for off in range(start, max(start, end - 3)):
                     (v,) = struct.unpack_from("<i", self._payload, off)
-                    rows.append((e.index, e.class_name, "", off, v, True, None, None))
+                    rows.append(dict(ex=e.index, name=e.class_name, type="", off=off,
+                                     val=v, editable=True, tag=None, add=None,
+                                     path=a.path, owned=True))
 
         if self.usmap is None:
             self.values_hint.setText(
@@ -854,11 +914,10 @@ class MainWindow(QMainWindow):
                 "property names.")
         elif named:
             self.values_hint.setText(
-                "Named properties recovered from the game's own reflection data. "
-                "Rows marked <i>zero</i> are stored in the header bitmap and occupy "
-                "no bytes. Gameplay tags can be swapped for any other name the "
-                "asset already references; adding a brand new tag would need the "
-                "package name table rebuilt.")
+                "Named properties from the game's own reflection data. Rows prefixed "
+                "with an asset name belong to something this one links to, such as the "
+                "unit a summon card creates, which is where its health and attack live. "
+                "Rows marked <i>not set</i> are left at their default and can be added.")
         else:
             self.values_hint.setText(
                 "Raw byte offsets, each read as a 32-bit integer. Offsets advance one "
@@ -866,62 +925,73 @@ class MainWindow(QMainWindow):
 
         cand = getattr(self, "_candidates", {})
         if cand and self.only_cand.isChecked():
-            rows = [r for r in rows if r[3] in cand]
-        staged = {v.offset: v.value for v in self.project.values if v.asset_path == a.path}
-        staged_tags = {t.offset: t.tag for t in self.project.tags if t.asset_path == a.path}
+            rows = [x for x in rows if x["off"] in cand and x["owned"]]
+        staged = {(v.asset_path, v.offset): v.value for v in self.project.values}
+        staged_tags = {(t.asset_path, t.offset): t.tag for t in self.project.tags}
+
         self.values.setRowCount(len(rows))
-        for r, (ei, name, typ, off, val, editable, tag_index, add_spec) in enumerate(rows):
-            cells = [f"+{ei}", name, typ,
+        for r, row in enumerate(rows):
+            off, path = row["off"], row["path"]
+            cells = [f"+{row['ex']}", row["name"], row["type"],
                      "not set" if off == -2 else ("zero" if off < 0 else str(off)),
-                     "" if val is None else str(val)]
+                     "" if row["val"] is None else str(row["val"])]
             for c, text in enumerate(cells):
                 it = QTableWidgetItem(text)
                 it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                if not row["owned"]:
+                    it.setForeground(QColor("#8fb0c8"))
                 self.values.setItem(r, c, it)
-            if off in cand:
-                self.values.item(r, 4).setText(f"{val}   (variant: {cand[off]})")
+            if off in cand and row["owned"]:
+                self.values.item(r, 4).setText(f"{row['val']}   (variant: {cand[off]})")
                 for c in range(5):
                     self.values.item(r, c).setBackground(QColor("#2d4f1e"))
                     self.values.item(r, c).setForeground(QColor("#d9f2c8"))
-            if tag_index is not None:
-                # Tags are FName references, so the choices are the names this
-                # package already carries.
+
+            if row["tag"] is not None:
                 combo = QComboBox()
                 choices = list(self.all_tags)
-                current_tag = staged_tags.get(off) or (
-                    self._names[tag_index] if tag_index < len(self._names) else "")
-                if current_tag and current_tag not in choices:
-                    choices.insert(0, current_tag)
+                current = staged_tags.get((path, off)) or row["val"]
+                if current and current not in choices:
+                    choices.insert(0, current)
                 combo.addItems(choices)
-                if current_tag in choices:
-                    combo.setCurrentIndex(choices.index(current_tag))
+                if current in choices:
+                    combo.setCurrentIndex(choices.index(current))
                 combo.currentTextChanged.connect(
-                    lambda text, o=off, nm=name: self._tag_changed(o, text, nm))
+                    lambda text, o=off, p=path: self._tag_changed(o, text, p))
                 self.values.setCellWidget(r, 5, combo)
                 continue
-            if add_spec is not None:
+
+            if row["add"] is not None:
                 pending = next((x for x in self.project.added
-                                if x.asset_path == a.path
-                                and (x.export_index, x.prop_index) == add_spec), None)
+                                if x.asset_path == path
+                                and (x.export_index, x.prop_index) == row["add"]), None)
                 for c in range(5):
                     self.values.item(r, c).setForeground(QColor("#7d8a86"))
-                new = QTableWidgetItem("" if pending is None else str(pending.value))
-                new.setData(Qt.UserRole, -2)
-                new.setData(Qt.UserRole + 1, add_spec)
-                new.setToolTip("This export leaves the property at its default. "
-                               "Enter a value to add it.")
+                cell = QTableWidgetItem("" if pending is None else str(pending.value))
+                cell.setData(Qt.UserRole, -2)
+                cell.setData(Qt.UserRole + 1, (row["add"], path, row["name"]))
+                cell.setToolTip("Left at its default, so absent from the payload. "
+                                "Enter a value to add it.")
                 if pending is not None:
-                    new.setBackground(QColor(ACCENT)); new.setForeground(QColor("white"))
-                self.values.setItem(r, 5, new)
+                    cell.setBackground(QColor(ACCENT)); cell.setForeground(QColor("white"))
+                self.values.setItem(r, 5, cell)
                 continue
-            new = QTableWidgetItem("" if off not in staged else str(staged[off]))
-            new.setData(Qt.UserRole, off)
-            if not editable or off < 0:
-                new.setFlags(new.flags() & ~Qt.ItemIsEditable)
-            if off in staged:
-                new.setBackground(QColor(ACCENT))
-                new.setForeground(QColor("white"))
-            self.values.setItem(r, 5, new)
+
+            key = (path, off)
+            cell = QTableWidgetItem("" if key not in staged else str(staged[key]))
+            cell.setData(Qt.UserRole, off)
+            cell.setData(Qt.UserRole + 2, path)
+            if not row["editable"] or off < 0:
+                cell.setFlags(cell.flags() & ~Qt.ItemIsEditable)
+                if row["type"] in ("ObjectProperty", "ClassProperty",
+                                   "SoftObjectProperty"):
+                    cell.setToolTip(
+                        "A reference to another object, stored as a package index. "
+                        "Typing a number here would repoint it at something else "
+                        "rather than change a value, so it is read only.")
+            if key in staged:
+                cell.setBackground(QColor(ACCENT)); cell.setForeground(QColor("white"))
+            self.values.setItem(r, 5, cell)
         self.values.resizeColumnsToContents()
         self.values.blockSignals(False)
 
@@ -1033,7 +1103,7 @@ class MainWindow(QMainWindow):
             self._art_image.save(p)
             self.statusBar().showMessage(f"wrote {p}", 5000)
 
-    def _tag_changed(self, offset, tag, label):
+    def _tag_changed(self, offset, tag, path=None):
         """Stage a gameplay tag change.
 
         Any tag used anywhere in the game can be chosen. If this asset has never
@@ -1042,11 +1112,11 @@ class MainWindow(QMainWindow):
         Args:
             offset (int): Byte offset of the tag's name index.
             tag (str): The tag to set.
-            label (str): Row label, unused beyond readability.
+            path (str | None): Asset to edit; defaults to the selected one.
         """
         if not self.current or not tag:
             return
-        self.project.set_tag(self.current.path, offset, tag)
+        self.project.set_tag(path or self.current.path, offset, tag)
         self._refresh_edits()
         self.statusBar().showMessage(f"tag set to {tag}", 6000)
 
@@ -1064,18 +1134,19 @@ class MainWindow(QMainWindow):
         off = item.data(Qt.UserRole)
         text = item.text().strip()
         spec = item.data(Qt.UserRole + 1)
+        path = item.data(Qt.UserRole + 2) or self.current.path
+
         if off == -2 and spec is not None:
-            export_index, prop_index = spec
+            (export_index, prop_index), owner, label = spec
             if not text:
                 self.project.added = [
                     x for x in self.project.added
-                    if not (x.asset_path == self.current.path
+                    if not (x.asset_path == owner
                             and (x.export_index, x.prop_index) == (export_index, prop_index))]
             else:
                 try:
-                    self.project.add_property(
-                        self.current.path, export_index, prop_index, int(text, 0),
-                        self.values.item(item.row(), 1).text())
+                    self.project.add_property(owner, export_index, prop_index,
+                                              int(text, 0), label.strip())
                 except ValueError:
                     QMessageBox.warning(self, "Not a number",
                                         f"{text!r} is not an integer.")
@@ -1083,16 +1154,16 @@ class MainWindow(QMainWindow):
                     return
             self._refresh_edits()
             return
+
         if not text:
             self.project.values = [v for v in self.project.values
-                                   if not (v.asset_path == self.current.path and v.offset == off)]
+                                   if not (v.asset_path == path and v.offset == off)]
         else:
             try:
-                self.project.set_value(self.current.path, off, int(text, 0),
-                                       f"{self.current.name}@{off}")
+                self.project.set_value(path, off, int(text, 0),
+                                       self.values.item(item.row(), 1).text().strip())
             except ValueError:
-                QMessageBox.warning(self, "Not a number",
-                                    f"{text!r} is not an integer.")
+                QMessageBox.warning(self, "Not a number", f"{text!r} is not an integer.")
                 item.setText("")
                 return
         self._refresh_edits()
