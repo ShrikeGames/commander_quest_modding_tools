@@ -105,8 +105,10 @@ class MainWindow(QMainWindow):
 
         self.classes = QListWidget()
         self.classes.currentItemChanged.connect(self._refilter)
-        self.classes.setMinimumWidth(230)
-        split.addWidget(self._boxed("Asset type", self.classes))
+        self.classes.setMinimumWidth(170)
+        classes_box = self._boxed("Asset type", self.classes)
+        classes_box.setMaximumWidth(320)
+        split.addWidget(classes_box)
 
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Name", "Title", "Category"])
@@ -117,10 +119,22 @@ class MainWindow(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.itemSelectionChanged.connect(self._select_asset)
-        split.addWidget(self._boxed("Assets", self.table))
+        assets_box = self._boxed("Assets", self.table)
+        assets_box.setMinimumWidth(380)
+        split.addWidget(assets_box)
 
-        split.addWidget(self._detail_panel())
-        split.setSizes([230, 460, 760])
+        detail = self._detail_panel()
+        detail.setMinimumWidth(420)
+        split.addWidget(detail)
+
+        for i in range(3):
+            split.setCollapsible(i, False)
+        # The filter list keeps its width; the asset table and the detail pane
+        # share whatever the window gains.
+        split.setStretchFactor(0, 0)
+        split.setStretchFactor(1, 3)
+        split.setStretchFactor(2, 4)
+        split.setSizes([210, 520, 720])
 
         self.main_tabs = QTabWidget()
         self.main_tabs.addTab(split, "Edit assets")
@@ -194,10 +208,12 @@ class MainWindow(QMainWindow):
 
         # --- Values ---
         page = QWidget(); lay = QVBoxLayout(page)
-        lay.addWidget(QLabel(
+        hint = QLabel(
             "Integer slots inside each export payload. Property <i>names</i> need a "
-            ".usmap, so these are addressed by offset - identify a field by comparing "
-            "a card with its '+' upgrade variant, then edit here."))
+            ".usmap, so these are addressed by offset. Identify a field by comparing "
+            "a card with its '+' upgrade variant, then edit here.")
+        hint.setWordWrap(True)
+        lay.addWidget(hint)
         row = QHBoxLayout()
         self.find_btn = QPushButton("Find fields vs '+' variant")
         self.find_btn.setToolTip(
@@ -237,10 +253,12 @@ class MainWindow(QMainWindow):
         """
         page = QWidget()
         lay = QVBoxLayout(page)
-        lay.addWidget(QLabel(
+        intro = QLabel(
             "The game loads every pak in its Paks folder, so a mod is <b>enabled</b> "
             "when its file lives there and <b>disabled</b> when it is held in the "
-            "staging folder. Toggling moves the file between the two."))
+            "staging folder. Toggling moves the file between the two.")
+        intro.setWordWrap(True)
+        lay.addWidget(intro)
 
         self.mods_table = QTableWidget(0, 6)
         self.mods_table.setHorizontalHeaderLabels(
