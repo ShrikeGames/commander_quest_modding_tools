@@ -28,6 +28,56 @@ from cqmod.project import Project
 ACCENT = "#B03A0B"
 
 
+class ArtView(QLabel):
+    """A label that fits its image to whatever room it is given.
+
+    QLabel clips a pixmap that is larger than the widget rather than scaling it,
+    so a fixed-size preview loses the top and bottom of a texture as soon as the
+    pane is shorter than the image. This keeps the decoded image and rescales it
+    on every resize instead.
+    """
+
+    def __init__(self, *a, **kw):
+        """Create an empty view."""
+        super().__init__(*a, **kw)
+        self._source = None
+        self.setMinimumSize(QSize(120, 120))
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+    def set_image(self, image):
+        """Show an image, or clear the view.
+
+        Args:
+            image (QImage | None): The image to display.
+        """
+        self._source = QPixmap.fromImage(image) if image is not None else None
+        self._rescale()
+
+    def clear(self):
+        """Drop the current image."""
+        self._source = None
+        super().clear()
+
+    def _rescale(self):
+        """Fit the stored image to the widget, preserving aspect ratio."""
+        if self._source is None or self._source.isNull():
+            return
+        target = self.size()
+        if target.width() < 8 or target.height() < 8:
+            return
+        super().setPixmap(self._source.scaled(
+            target, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+
+    def resizeEvent(self, event):
+        """Rescale when the available space changes.
+
+        Args:
+            event (QResizeEvent): The resize event.
+        """
+        super().resizeEvent(event)
+        self._rescale()
+
+
 class LoadThread(QThread):
     """Opens the pak and builds the catalog off the UI thread.
 
@@ -214,10 +264,10 @@ class MainWindow(QMainWindow):
         self.art_pick.currentIndexChanged.connect(self._art_pick_changed)
         self.art_pick.setVisible(False)
         lay.addWidget(self.art_pick)
-        self.art = QLabel(alignment=Qt.AlignCenter)
-        self.art.setMinimumHeight(360)
+        self.art = ArtView(alignment=Qt.AlignCenter)
+        self.art.setMinimumHeight(240)
         self.art.setStyleSheet("border:1px solid #555;")
-        lay.addWidget(self.art)
+        lay.addWidget(self.art, 1)
         self.art_info = QLabel(""); lay.addWidget(self.art_info)
         row = QHBoxLayout()
         self.replace_art_btn = QPushButton("Replace art...")
@@ -640,9 +690,10 @@ class MainWindow(QMainWindow):
             img = texture.to_image(tex)
             self._art_image = img
             data = img.tobytes("raw", "RGBA")
-            qi = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
-            self.art.setPixmap(QPixmap.fromImage(qi).scaled(
-                QSize(430, 430), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            # Keep a reference: QImage does not copy the buffer it is given.
+            self._art_bytes = data
+            self.art.set_image(
+                QImage(data, img.width, img.height, QImage.Format_RGBA8888))
             edit = next((t for t in self.project.textures
                          if t.texture_path == path), None)
             pending = (edit.image_path or edit.source_texture) if edit else None
