@@ -164,6 +164,25 @@ def main():
         check("zero-valued properties are reported as such",
               any(f.name == "PileLocation" for f in zeroed))
 
+        # Struct and array sizes that the type alone cannot give, solved from
+        # the game's own data. Without these, placement stops at CMUnitData's
+        # Tags and never reaches MaxHealth.
+        extra = um.solve_sizes(r, assets)
+        check("variable-typed property sizes are solved", extra > 100, str(extra))
+        stats = {}
+        for nm in ("DA_Unit_Human_Cataphract", "DA_Unit_Human_GrowingSquire"):
+            u = by.get(nm)
+            if not u:
+                continue
+            pl2 = r.read(u.uexp)
+            stats[nm] = {f.name: f.value for e in u.exports for f in um.place(e, pl2)}
+        check("unit stats match the values shown in game",
+              stats.get("DA_Unit_Human_Cataphract", {}).get("MaxHealth") == 13
+              and stats.get("DA_Unit_Human_Cataphract", {}).get("AttackDamage") == 4
+              and stats.get("DA_Unit_Human_GrowingSquire", {}).get("MaxHealth") == 7
+              and stats.get("DA_Unit_Human_GrowingSquire", {}).get("AttackDamage") == 3,
+              "Cataphract 13/4, Squire 7/3")
+
     print("\nproperty schema:")
     layouts = schema.build(r, assets)
     solved = sum(l.solved_count for l in layouts.values())

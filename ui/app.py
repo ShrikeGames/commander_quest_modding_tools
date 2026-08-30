@@ -44,6 +44,12 @@ class LoadThread(QThread):
         try:
             reader = PakReader(config.pak_path(), config.aes_key())
             assets = catalog.build(reader)
+            try:
+                # Sizing struct and array properties needs the whole catalog, so
+                # it happens here rather than blocking the first selection.
+                usmap.Usmap.load().solve_sizes(reader, assets)
+            except Exception:
+                pass
             self.done.emit(reader, assets, "")
         except Exception as e:
             self.done.emit(None, None, f"{e}\n\n{traceback.format_exc()}")
@@ -69,10 +75,7 @@ class MainWindow(QMainWindow):
         self.project = Project()
         self.project_path: Path | None = None
         self.mods = ModManager(config.paks_dir(), config.mods_dir(), config.pak_path())
-        try:
-            self.usmap = usmap.Usmap.load()
-        except usmap.UsmapError:
-            self.usmap = None
+        self.usmap = None
         self._payload = b""
 
         self._build_ui()
@@ -429,6 +432,12 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("Load failed")
             return
         self.reader, self.assets = reader, assets
+        try:
+            self.usmap = usmap.Usmap.load()
+            n = self.usmap.solve_sizes(reader, assets)
+            self.statusBar().showMessage(f"resolved {n} struct/array sizes", 5000)
+        except usmap.UsmapError:
+            self.usmap = None
         classes = sorted({a.class_name for a in assets if a.class_name})
         self.classes.addItem(f"All ({len(assets)})")
         for c in classes:

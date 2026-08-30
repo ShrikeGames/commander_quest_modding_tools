@@ -20,6 +20,8 @@ import json, struct
 from dataclasses import dataclass
 from pathlib import Path
 
+import collections
+
 from . import ftext
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "schema" / "usmap.json"
@@ -95,6 +97,9 @@ class Usmap:
     def __init__(self, data: dict):
         """Wrap a parsed schema document."""
         self.data = data
+        self.sizes = {}
+        """Empirically solved sizes for properties whose type is variable,
+        keyed by ``(class name, property index)``. See :meth:`solve_sizes`."""
 
     @classmethod
     def load(cls, path=None) -> "Usmap":
@@ -143,6 +148,54 @@ class Usmap:
         e = self.data.get(class_name)
         return e["properties"] if e else []
 
+    def solve_sizes(self, reader, assets) -> int:
+        """Measure the serialized size of variable-typed properties.
+
+        Types alone do not size a struct or an array, but many of them are the
+        same length in every asset that uses them. Seeding each class's size
+        equations with the sizes the types already give, any equation left with
+        one unknown determines it. ``CMUnitData::Tags`` resolves to 12 bytes
+        this way, which is what lets placement continue to ``MaxHealth``.
+
+        Sizes that genuinely vary, such as text and most arrays, are left
+        unknown rather than averaged into something wrong.
+
+        Args:
+            reader (cqmod.pak.PakReader): An open archive.
+            assets (list[cqmod.catalog.Asset]): The catalog to learn from.
+
+        Returns:
+            int: How many variable-typed properties were resolved.
+        """
+        from . import schema
+
+        obs = schema.observe(reader, assets)
+        known = {}
+        for cls in obs:
+            for p in self.properties(cls):
+                if p["type"] in SERIALIZED_SIZE:
+                    known[(cls, p["index"])] = SERIALIZED_SIZE[p["type"]]
+        seeded = len(known)
+
+        changed = True
+        while changed:
+            changed = False
+            for cls, olist in obs.items():
+                by = collections.defaultdict(set)
+                for o in olist:
+                    by[o.indices].add(o.fixed_bytes)
+                for idxs, sizes in by.items():
+                    if len(sizes) != 1:
+                        continue          # a variable property is in play
+                    total = next(iter(sizes))
+                    unknown = [i for i in idxs if (cls, i) not in known]
+                    rest = total - sum(known[(cls, i)] for i in idxs if (cls, i) in known)
+                    if len(unknown) == 1 and rest >= 0:
+                        known[(cls, unknown[0])] = rest
+                        changed = True
+        self.sizes = known
+        return len(known) - seeded
+
     def place(self, export, payload: bytes) -> list:
         """Work out which bytes of a payload hold which property.
 
@@ -180,6 +233,8 @@ class Usmap:
                 size = texts[cursor] - cursor
             elif p["type"] in SERIALIZED_SIZE:
                 size = SERIALIZED_SIZE[p["type"]]
+            elif (export.class_name, idx) in self.sizes:
+                size = self.sizes[(export.class_name, idx)]
             else:
                 break
             value = None

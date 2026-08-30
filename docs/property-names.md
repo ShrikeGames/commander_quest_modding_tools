@@ -94,12 +94,39 @@ stops lining up with the pak fails loudly.
 `PileLocation` showing as `zero` is the header bitmap in action: a zero-valued
 property is a bit in the header and occupies no bytes.
 
+## Where the stats actually live
+
+Unit attack and health are **not on the card**. A summon card points at a
+`DA_Unit_*` asset through `CMCardData_Summon::UnitData`, and that asset carries
+them:
+
+```
+DA_Unit_Human_Cataphract       AttackDamage 4    MaxHealth 13
+DA_Unit_Human_GrowingSquire    AttackDamage 3    MaxHealth 7
+```
+
+Both match the collection screen exactly, and the self-test asserts it. Select
+the unit asset rather than the card to edit them.
+
+Reaching `MaxHealth` needs one extra step. It sits at index 1, right after
+`Tags`, a `StructProperty` whose size no type table can give. Seeding each
+class's size equations with the sizes the types already provide leaves many
+equations with a single unknown, which determines it: `CMUnitData::Tags` is 12
+bytes. That resolves 206 further properties across the game.
+
 ## What is still not named
 
 Placement stops at the first variable-length property it cannot measure, so on a
 card the tail after `UseEffects` (an `ArrayProperty`) is unresolved. Parsing
 array and struct payloads would extend this further.
 
-And the schema settles one earlier puzzle: `CMCardData` has **no cost property
-at all**. The mana cost shown on the collection screen is not stored on the card,
-which is why correlating known costs against card payloads found nothing.
+Placement also halts at any variable-size struct it cannot measure. On a summon
+card that is `UseRuleData`, which hides the six properties after it.
+
+And the schema settles one earlier puzzle: **mana cost is not a property at
+all.** Searching all 309 classes and 5,146 script structs finds no cost field on
+any card type. `CMCardDataRow::price` is the shop price, `CMCommanderData::BaseMana`
+is the player's pool, and the tag containers hold card types rather than costs.
+`GetDisplayUseCost` exists only as a function, so the number on the collection
+screen is computed at runtime. That is why correlating known costs against card
+payloads found nothing, and it is not something a value edit can change.
