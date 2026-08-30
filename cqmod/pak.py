@@ -369,13 +369,25 @@ class PakReader:
 
         if not e.is_compressed:
             self._f.seek(e.offset + hs)
+            if e.encrypted:
+                # Encrypted data is stored padded to the AES block size, so the
+                # padding is read, decrypted, then discarded.
+                padded = (e.size + 15) & ~15
+                return self._decrypt(self._f.read(padded))[:e.size]
             return self._f.read(e.size)
 
         out = bytearray()
         remaining = e.uncompressed_size
         for (bs, be) in blocks:
             self._f.seek(e.offset + bs)
-            comp = self._f.read(be - bs)
+            raw_len = be - bs
+            if e.encrypted:
+                # Encrypted blocks are stored padded to the AES block size.
+                # Decrypt the padded span, then hand the decoder only the real
+                # compressed length: trailing padding makes it fail outright.
+                comp = self._decrypt(self._f.read((raw_len + 15) & ~15))[:raw_len]
+            else:
+                comp = self._f.read(raw_len)
             n = min(cbs, remaining) if cbs else remaining
             out += oodle.decompress(comp, n)
             remaining -= n

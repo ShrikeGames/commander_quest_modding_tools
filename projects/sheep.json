@@ -12,6 +12,18 @@
    "key": "Richard_Outgame_Desc",
    "value": "\"After all, sheep think that they are smart.\"",
    "locale": "en"
+  },
+  {
+   "namespace": "ST_Gears",
+   "key": "ThreeLionFlag_Title",
+   "value": "Three Sheeps Flag",
+   "locale": "en"
+  },
+  {
+   "namespace": "ST_Gears",
+   "key": "ThreeLionFlag_Desc",
+   "value": "Increase the number of units summoned by 3 when summoning <Desc_Bold>beast</> units. (Richard only)",
+   "locale": "en"
   }
  ],
  "textures": [

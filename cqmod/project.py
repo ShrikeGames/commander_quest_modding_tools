@@ -27,6 +27,34 @@ from .pak import build_pak
 LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
 
 
+def _value_widths(reader, path, body):
+    """Map each placed property's offset to the width it serializes at.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        path (str): Pak path of the asset, without extension.
+        body (bytes): Its current ``.uexp``.
+
+    Returns:
+        dict[int, int]: Offset to byte width. Empty if the schema is missing,
+        in which case callers fall back to four bytes.
+    """
+    try:
+        um = usmap.Usmap.load()
+        info = _asset_info(reader, path)
+    except Exception:
+        return {}
+    out = {}
+    for e in info.exports:
+        try:
+            for f in um.place(e, body):
+                if f.offset >= 0:
+                    out[f.offset] = f.size
+        except Exception:
+            continue
+    return out
+
+
 def _asset_info(reader, path):
     """Describe one asset the way the catalog does, for a single path.
 
@@ -404,12 +432,17 @@ class Project:
                 struct.pack_into("<I", payload_ba, off, index)
                 say(f"  name   {Path(asset).name} @{t.offset} = {t.tag}")
 
+            widths = _value_widths(reader, asset, bytes(payload_ba)) if self.values else {}
             for v in [x for x in self.values if x.asset_path == asset]:
                 off = moved(v.offset)
-                if not (0 <= off <= len(payload_ba) - 4):
+                # A value is written at the width its property actually uses:
+                # an enum or a boolean is one byte, not four.
+                width = widths.get(off, 4)
+                if not (0 <= off <= len(payload_ba) - width):
                     raise ValueError(f"{asset}: offset {off} outside .uexp "
-                                     f"(0..{len(payload_ba)-4})")
-                struct.pack_into("<i", payload_ba, off, v.value)
+                                     f"(0..{len(payload_ba)-width})")
+                payload_ba[off:off + width] = int(v.value).to_bytes(
+                    width, "little", signed=width == 4)
                 say(f"  value  {Path(asset).name} @{v.offset} = {v.value}"
                     + (f"  ({v.label})" if v.label else ""))
 

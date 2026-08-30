@@ -13,6 +13,7 @@ game data.
 | [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
 | [Starting decks](starting-decks.md) | Editing what cards a commander begins with |
 | [Adding properties](adding-properties.md) | Giving an asset a stat it does not set |
+| [What an effect targets](targeting.md) | Class branches, gameplay tags, and which you can change |
 | [Property names](property-names.md) | Recovering the real schema from the running game |
 | [Unit graphics](unit-graphics.md) | How units are drawn, and what replacing them would take |
 | [Replacing textures](textures.md) | Block compression, mip chains, and art swapping |

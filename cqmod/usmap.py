@@ -57,6 +57,11 @@ STRUCT_SIZE = {
 TAG_CONTAINER = "GameplayTagContainer"
 """A count followed by that many FNames, each an index into the package's names."""
 
+EDITABLE_TYPES = ("IntProperty", "EnumProperty", "ByteProperty", "BoolProperty")
+"""Types a value edit can write. Object and class properties are excluded: they
+serialize as a package index, so typing a number repoints the reference rather
+than changing a value."""
+
 VARIABLE_TYPES = {
     "TextProperty", "StrProperty", "ArrayProperty",
     "StructProperty", "MapProperty", "SetProperty",
@@ -102,9 +107,11 @@ class Field:
         AttackType at a VFX export leaves it with no attack at all.
 
         Returns:
-            bool: True only for plain numbers a user can meaningfully type.
+            bool: True for plain numbers a user can meaningfully type, which
+            includes enums and booleans: those are small integers chosen from a
+            fixed set, not references to other objects.
         """
-        return self.size == 4 and self.type == "IntProperty"
+        return self.type in EDITABLE_TYPES and self.size == SERIALIZED_SIZE[self.type]
 
     @property
     def is_reference(self) -> bool:

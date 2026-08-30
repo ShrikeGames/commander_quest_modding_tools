@@ -76,6 +76,24 @@ def main():
     h = unversioned.parse(payload, 0)
     check("unversioned header parses", h.indices == [0, 1, 7, 11, 16, 19], str(h.indices))
 
+    print("\nencrypted config files:")
+    enc = [(k, v) for k, v in r.entries.items() if v.encrypted]
+    good = 0
+    for path, ent in enc:
+        try:
+            if len(r.read(path)) == ent.uncompressed_size:
+                good += 1
+        except Exception:
+            pass
+    check("every per-entry encrypted file decodes", good == len(enc),
+          f"{good}/{len(enc)}, all .ini")
+    tags_ini = "Commander/Config/DefaultGameplayTags.ini"
+    if tags_ini in r:
+        text = r.read(tags_ini).decode("utf-8", "replace")
+        registered = text.count('Tag="')
+        check("the gameplay tag registry is readable", registered > 200,
+              f"{registered} tags")
+
     print("\nlocres:")
     loc = locres.load(r.read(LOC))
     check("locres round-trips byte-identically", locres.save(loc) == loc.raw,
@@ -293,6 +311,30 @@ def main():
     check("every solved layout reproduces its observations",
           len(perfect) == len(checkable), f"{len(perfect)}/{len(checkable)}")
     mv = layouts["CMEffectData_MoveCard"]
+    tlf = by.get("DA_Gear_ThreeLionFlag")
+    if tlf and um:
+        tp = r.read(tlf.uexp)
+        branch = next((f for e in tlf.exports for f in um.place(e, tp)
+                       if f.name == "TargetUnitClassBranch"), None)
+        check("an enum is editable and one byte wide",
+              branch is not None and branch.editable and branch.size == 1,
+              f"value {branch.value}" if branch else "not found")
+        if branch:
+            proj5 = Project(name="EnumCheck")
+            proj5.set_value(tlf.path, branch.offset, 4, "TargetUnitClassBranch")
+            raw5 = proj5.build(r)
+            with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f5:
+                f5.write(raw5); tmp5 = f5.name
+            m5 = PakReader(tmp5)
+            g5 = catalog.build_one(m5, tlf.path)[0]
+            p5 = m5.read(tlf.uexp)
+            v5 = {f.name: f.value for e in g5.exports for f in um.place(e, p5)}
+            check("an enum edit writes one byte, not four",
+                  v5.get("TargetUnitClassBranch") == 4 and v5.get("BuffValue") == 3
+                  and len(p5) == len(tp),
+                  f"branch={v5.get('TargetUnitClassBranch')} buff={v5.get('BuffValue')}")
+            m5.close(); Path(tmp5).unlink()
+
     check("MoveCard sizes are forced by the data",
           mv.properties[13].size == 4 and mv.properties[11].size == 12,
           f"idx13={mv.properties[13].size} idx11={mv.properties[11].size}")
