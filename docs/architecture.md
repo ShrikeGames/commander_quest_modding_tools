@@ -9,6 +9,7 @@ cqmod/project.py     staged edits  ->  a mod pak
 cqmod/mods.py        enable / disable installed mods
 cqmod/catalog.py     the asset index
 cqmod/diff.py        variant comparison / field finder
+cqmod/schema.py      solved property sizes per class
       |
 cqmod/uasset.py      package headers      cqmod/locres.py    localization
 cqmod/unversioned.py property headers     cqmod/texture.py   card art

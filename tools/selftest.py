@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -138,6 +138,23 @@ def main():
     ml = locres.load(m.read(LOC))
     check("built locres carries the new title",
           ml.get("ST_Card_Supply", "Insight_Title") == "Pot of Greed")
+    print("\nproperty schema:")
+    layouts = schema.build(r, assets)
+    solved = sum(l.solved_count for l in layouts.values())
+    total = sum(len(l.properties) for l in layouts.values())
+    checkable = [l for l in layouts.values() if l.checked]
+    perfect = [l for l in checkable if l.confidence == 1.0]
+    check("solver derives sizes for a useful share of properties", solved > 250,
+          f"{solved}/{total}")
+    check("every solved layout reproduces its observations",
+          len(perfect) == len(checkable), f"{len(perfect)}/{len(checkable)}")
+    mv = layouts["CMEffectData_MoveCard"]
+    check("MoveCard sizes are forced by the data",
+          mv.properties[13].size == 4 and mv.properties[11].size == 12,
+          f"idx13={mv.properties[13].size} idx11={mv.properties[11].size}")
+    zero_seen = any(e.zero_indices for a in assets for e in a.exports)
+    check("zero-valued properties are decoded from the header bitmap", zero_seen)
+
     m.close(); Path(tmp).unlink()
     r.close()
 

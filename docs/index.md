@@ -18,6 +18,7 @@ game data.
 | | |
 |---|---|
 | [Architecture](architecture.md) | Module map and data flow |
+| [Property sizes](property-sizes.md) | Solving property layouts without a .usmap |
 | [Reverse engineering notes](reverse-engineering.md) | How the format was worked out |
 | [Pak archives](formats/pak.md) | UE pak v11, encryption, entry encoding |
 | [Packages](formats/package.md) | `.uasset` header, name/import/export tables |

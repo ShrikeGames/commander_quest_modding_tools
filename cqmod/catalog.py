@@ -39,6 +39,8 @@ class ExportInfo:
         prop_indices (list[int]): Property indices carrying a value.
         header_bytes (int): Size of the unversioned header; value data starts at
             ``start + header_bytes``.
+        zero_indices (list[int]): Of those, the ones whose value is zero. They
+            are stored in the header bitmap and occupy no value bytes.
     """
 
     index: int
@@ -48,6 +50,17 @@ class ExportInfo:
     end: int
     prop_indices: list = field(default_factory=list)
     header_bytes: int = 0
+    zero_indices: list = field(default_factory=list)
+
+    @property
+    def stored_indices(self) -> list:
+        """Property indices that occupy bytes in the value region.
+
+        Returns:
+            list[int]: :attr:`prop_indices` minus the zero-valued ones.
+        """
+        z = set(self.zero_indices)
+        return [i for i in self.prop_indices if i not in z]
 
 
 @dataclass
@@ -181,6 +194,7 @@ def build(reader, locale: str = DEFAULT_LOCALE, progress=None) -> list:
                 try:
                     h = unversioned.parse(payload, s)
                     info.prop_indices, info.header_bytes = h.indices, h.size
+                    info.zero_indices = sorted(h.zero_indices)
                 except Exception:
                     pass
             a.exports.append(info)

@@ -73,12 +73,31 @@ class Header:
         size (int): Bytes the header occupies, including any zero bitmap. Value
             data begins this many bytes after the header's start.
         zero_mask_bits (int): Number of bits in the trailing zero bitmap.
+        zero_indices (set): Property indices whose value is zero. These are
+            recorded in the bitmap and occupy **no bytes** in the value region,
+            which is why the same property set can produce different payload
+            sizes.
     """
 
     fragments: list
     indices: list
     size: int
     zero_mask_bits: int
+    zero_indices: set = None
+
+    def __post_init__(self):
+        """Default the zero set without sharing one instance across headers."""
+        if self.zero_indices is None:
+            self.zero_indices = set()
+
+    @property
+    def stored_indices(self) -> list:
+        """Property indices that actually occupy bytes in the value region.
+
+        Returns:
+            list[int]: :attr:`indices` minus the zero-valued ones, in order.
+        """
+        return [i for i in self.indices if i not in self.zero_indices]
 
 
 def parse(data: bytes, off: int = 0) -> Header:
@@ -98,6 +117,7 @@ def parse(data: bytes, off: int = 0) -> Header:
             which normally means ``off`` did not point at an export boundary.
     """
     frags, indices = [], []
+    masked = []          # indices covered by the zero bitmap, in bit order
     idx = 0
     o = off
     while True:
@@ -105,11 +125,25 @@ def parse(data: bytes, off: int = 0) -> Header:
         f = Fragment.unpack(v)
         frags.append(f)
         idx += f.skip
-        indices.extend(range(idx, idx + f.value_count))
+        run = list(range(idx, idx + f.value_count))
+        indices.extend(run)
+        if f.has_zeroes:
+            masked.extend(run)
         idx += f.value_count
         if f.is_last:
             break
-    zero_bits = sum(f.value_count for f in frags if f.has_zeroes)
+
+    zero_bits = len(masked)
+    zeros = set()
     if zero_bits:
-        o += (zero_bits + 7) // 8
-    return Header(frags, indices, o - off, zero_bits)
+        # UE stores the mask as a uint8, a uint16, or a run of uint32s.
+        if zero_bits <= 8:
+            width = 1
+        elif zero_bits <= 16:
+            width = 2
+        else:
+            width = ((zero_bits + 31) // 32) * 4
+        mask = int.from_bytes(data[o:o + width], "little")
+        o += width
+        zeros = {p for n, p in enumerate(masked) if mask >> n & 1}
+    return Header(frags, indices, o - off, zero_bits, zeros)
