@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from datetime import datetime
 
-from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain
+from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain, decks
 from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
         self.usmap = None
         self.all_tags = []
         self.art_paths = []
+        self.card_rows = []
         self.unit_bp = {}
         self._art_candidates = []
         self._payload = b""
@@ -318,6 +319,18 @@ class MainWindow(QMainWindow):
         self.values.itemChanged.connect(self._value_changed)
         lay.addWidget(self.values)
         self.tabs.addTab(page, "Values")
+
+        # --- Deck ---
+        page = QWidget(); lay = QVBoxLayout(page)
+        self.deck_hint = QLabel()
+        self.deck_hint.setWordWrap(True)
+        lay.addWidget(self.deck_hint)
+        self.deck_table = QTableWidget(0, 3)
+        self.deck_table.setHorizontalHeaderLabels(["Deck", "Slot", "Card"])
+        self.deck_table.verticalHeader().setVisible(False)
+        self.deck_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        lay.addWidget(self.deck_table)
+        self.tabs.addTab(page, "Deck")
 
         # --- Pending edits ---
         page = QWidget(); lay = QVBoxLayout(page)
@@ -511,6 +524,7 @@ class MainWindow(QMainWindow):
             n = self.usmap.solve_sizes(reader, assets)
             self.all_tags = self.usmap.collect_tags(reader, assets)
             self.unit_bp = artchain.unit_blueprints(reader, assets, self.usmap)
+            self.card_rows = decks.card_rows(reader)
             self.art_paths = sorted(
                 p[:-5] for p in reader.files()
                 if p.endswith(".uexp") and Path(p).name.startswith("T_"))
@@ -582,7 +596,61 @@ class MainWindow(QMainWindow):
         self.find_btn.setEnabled(bool(self._variant_of(a)))
         self._load_values(a)
         self._load_links(a)
+        self._load_deck(a)
         self._load_art(a)
+
+    def _load_deck(self, a):
+        """Show a commander's starting decks, one row per card slot.
+
+        Deck slots name rows of the card table rather than card assets, so the
+        choices are the table's row names. A card the commander has never used
+        is fine: the build adds the name to its package.
+
+        Args:
+            a (cqmod.catalog.Asset): The selected asset.
+        """
+        self.deck_table.setRowCount(0)
+        found = decks.parse(self.reader, a) if a.class_name == "CMCommanderData" else []
+        self.tabs.setTabVisible(4, bool(found))
+        if not found:
+            self.deck_hint.setText("")
+            return
+        self.deck_hint.setText(
+            f"{len(found)} starting deck(s), {sum(len(d) for d in found)} cards. "
+            "Slots name rows of DT_Cards; picking one the commander has never "
+            "used adds it to the package at build time.")
+        staged = {t.offset: t.tag for t in self.project.tags if t.asset_path == a.path}
+        rows = [(n, i, c) for n, d in enumerate(found) for i, c in enumerate(d.cards)]
+        self.deck_table.setRowCount(len(rows))
+        for r, (deck_no, slot, card) in enumerate(rows):
+            for col, text in ((0, f"deck {deck_no + 1}"), (1, str(slot + 1))):
+                it = QTableWidgetItem(text)
+                it.setFlags(it.flags() & ~Qt.ItemIsEditable)
+                self.deck_table.setItem(r, col, it)
+            combo = QComboBox()
+            choices = list(self.card_rows)
+            current = staged.get(card.offset, card.row)
+            if current not in choices:
+                choices.insert(0, current)
+            combo.addItems(choices)
+            combo.setCurrentIndex(choices.index(current))
+            combo.currentTextChanged.connect(
+                lambda text, o=card.offset: self._deck_changed(o, text))
+            self.deck_table.setCellWidget(r, 2, combo)
+        self.deck_table.resizeColumnsToContents()
+
+    def _deck_changed(self, offset, row):
+        """Stage a starting deck change.
+
+        Args:
+            offset (int): Byte offset of the slot's name index.
+            row (str): Card table row to put in the slot.
+        """
+        if not self.current or not row:
+            return
+        self.project.set_name_ref(self.current.path, offset, row)
+        self._refresh_edits()
+        self.statusBar().showMessage(f"deck slot set to {row}", 6000)
 
     def _load_links(self, a):
         """Offer buttons for the assets this one references.
@@ -986,7 +1054,7 @@ class MainWindow(QMainWindow):
         for v in p.values:
             lines.append(f"value   {Path(v.asset_path).name} @{v.offset} = {v.value}")
         for t in p.tags:
-            lines.append(f"tag     {Path(t.asset_path).name} @{t.offset} = {t.tag}")
+            lines.append(f"name    {Path(t.asset_path).name} @{t.offset} = {t.tag}")
         self.edits.setPlainText("\n".join(lines) or "(no edits staged)")
         n = len(p.texts) + len(p.textures) + len(p.values) + len(p.tags)
         self.tabs.setTabText(3, f"Pending edits ({n})" if n else "Pending edits")

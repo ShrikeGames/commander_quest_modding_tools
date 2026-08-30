@@ -207,6 +207,20 @@ class Project:
                 return
         self.values.append(ValueEdit(asset_path, offset, value, label))
 
+    def set_name_ref(self, asset_path, offset, name):
+        """Stage a change to an ``FName`` reference in an asset's payload.
+
+        Gameplay tags and starting deck slots are both FName references, an
+        index into the owning package's name table, so both are staged this way
+        and the build appends the name where the asset lacks it.
+
+        Args:
+            asset_path (str): Pak path of the asset, without extension.
+            offset (int): Byte offset of the name index.
+            name (str): Value to set, a tag or a card table row.
+        """
+        return self.set_tag(asset_path, offset, name)
+
     def set_tag(self, asset_path, offset, tag):
         """Stage a gameplay tag change, replacing any edit at the same offset.
 
@@ -280,7 +294,7 @@ class Project:
                 if not (0 <= t.offset <= len(payload) - 4):
                     raise ValueError(f"{asset}: tag offset {t.offset} outside .uexp")
                 struct.pack_into("<I", payload, t.offset, index)
-                say(f"  tag    {Path(asset).name} @{t.offset} = {t.tag}")
+                say(f"  name   {Path(asset).name} @{t.offset} = {t.tag}")
 
             for v in [x for x in self.values if x.asset_path == asset]:
                 if not (0 <= v.offset <= len(payload) - 4):

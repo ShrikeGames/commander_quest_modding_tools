@@ -11,6 +11,7 @@ game data.
 | [GUI guide](gui-guide.md) | The editor, tab by tab |
 | [Finding fields](finding-fields.md) | How to locate the number you actually want to change |
 | [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
+| [Starting decks](starting-decks.md) | Editing what cards a commander begins with |
 | [Property names](property-names.md) | Recovering the real schema from the running game |
 | [Unit graphics](unit-graphics.md) | How units are drawn, and what replacing them would take |
 | [Replacing textures](textures.md) | Block compression, mip chains, and art swapping |

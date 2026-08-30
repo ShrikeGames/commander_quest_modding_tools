@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain, decks
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -344,6 +344,50 @@ def main():
                 linked += 1
         check("most summon cards resolve their unit", linked > len(summons) * 0.8,
               f"{linked}/{len(summons)}")
+
+    print("\nstarting decks:")
+    rows = decks.card_rows(r)
+    check("the card table's row names are readable", len(rows) > 200, f"{len(rows)} rows")
+    commanders = [x for x in assets if x.class_name == "CMCommanderData"]
+    parsed = {x.name: decks.parse(r, x) for x in commanders}
+    check("every commander has two decks",
+          all(len(v) == 2 for v in parsed.values()),
+          str({k: len(v) for k, v in parsed.items()}))
+    check("every deck holds ten cards",
+          all(len(d) == 10 for v in parsed.values() for d in v))
+    jeanne = parsed.get("DA_Commander_Jeanne")
+    if jeanne:
+        check("Jeanne's human deck reads correctly",
+              [c.row for c in jeanne[0].cards].count("Summon_Militia") == 5
+              and "Infra_HealFountain" in [c.row for c in jeanne[0].cards],
+              str(sorted({c.row for c in jeanne[0].cards})))
+    check("non-commander assets yield no decks",
+          not any(decks.parse(r, x) for x in assets[:40]
+                  if x.class_name != "CMCommanderData"))
+
+    if jeanne:
+        cmd = by["DA_Commander_Jeanne"]
+        before_names = uasset.parse(r.read(cmd.uasset)).names
+        newcard = next(x for x in rows if x not in before_names)
+        proj3 = Project(name="DeckCheck")
+        proj3.set_name_ref(cmd.path, jeanne[0].cards[0].offset, newcard)
+        raw3 = proj3.build(r)
+        with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f3:
+            f3.write(raw3); tmp3 = f3.name
+        m3 = PakReader(tmp3)
+
+        class _Shim:
+            uasset = cmd.uasset
+            uexp = cmd.uexp
+
+        after3 = decks.parse(m3, _Shim())
+        check("a deck slot can be set to an unused card",
+              after3 and after3[0].cards[0].row == newcard,
+              after3[0].cards[0].row if after3 else "no deck")
+        check("the rest of the deck is untouched",
+              after3 and [c.row for c in after3[0].cards[1:]]
+              == [c.row for c in jeanne[0].cards[1:]])
+        m3.close(); Path(tmp3).unlink()
 
     print("\nname table insertion:")
     data_assets = [p for p in r.files()
