@@ -14,7 +14,15 @@ axis, which is fast and good enough for texture replacement. This is not a
 competitive encoder, and it does not need to be: it only has to look right.
 """
 from __future__ import annotations
-import numpy as np
+
+try:
+    import numpy as np
+except ImportError as _e:  # pragma: no cover - depends on the environment
+    raise ImportError(
+        "Block-compressed textures need numpy. Install the requirements into "
+        "the interpreter running the tool:\n"
+        "    pip install -r requirements.txt"
+    ) from _e
 
 BLOCK = 4
 

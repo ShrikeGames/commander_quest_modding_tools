@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from datetime import datetime
 
-from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap
+from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain
 from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
@@ -79,6 +79,8 @@ class MainWindow(QMainWindow):
         self.usmap = None
         self.all_tags = []
         self.art_paths = []
+        self.unit_bp = {}
+        self._art_candidates = []
         self._payload = b""
 
         self._build_ui()
@@ -205,6 +207,13 @@ class MainWindow(QMainWindow):
 
         # --- Art ---
         page = QWidget(); lay = QVBoxLayout(page)
+        self.art_pick = QComboBox()
+        self.art_pick.setToolTip(
+            "Textures this asset's model uses. A unit reaches several through "
+            "its Blueprint and mesh, so pick the one you mean.")
+        self.art_pick.currentIndexChanged.connect(self._art_pick_changed)
+        self.art_pick.setVisible(False)
+        lay.addWidget(self.art_pick)
         self.art = QLabel(alignment=Qt.AlignCenter)
         self.art.setMinimumHeight(360)
         self.art.setStyleSheet("border:1px solid #555;")
@@ -451,6 +460,7 @@ class MainWindow(QMainWindow):
             self.usmap = usmap.Usmap.load()
             n = self.usmap.solve_sizes(reader, assets)
             self.all_tags = self.usmap.collect_tags(reader, assets)
+            self.unit_bp = artchain.unit_blueprints(reader, assets, self.usmap)
             self.art_paths = sorted(
                 p[:-5] for p in reader.files()
                 if p.endswith(".uexp") and Path(p).name.startswith("T_"))
@@ -573,20 +583,60 @@ class MainWindow(QMainWindow):
                 return
 
     def _load_art(self, a):
-        """Show an asset's art, or why it cannot be shown.
+        """Show an asset's art, following the model chain where needed.
+
+        A card names its illustration directly. A unit does not: its appearance
+        hangs off the Blueprint the summon card points at, reached through the
+        Blueprint's materials and its mesh's material slots. Several textures
+        turn up that way, so they are all offered and the best guess selected.
 
         Args:
             a (cqmod.catalog.Asset): The selected asset.
         """
         self.art.clear(); self.art_info.setText("")
-        self.replace_art_btn.setEnabled(False); self.export_art_btn.setEnabled(False)
-        self.copy_art_btn.setEnabled(False)
-        if not a.texture or (a.texture + ".uexp") not in self.reader:
-            self.art.setText("no art"); return
+        for b in (self.replace_art_btn, self.export_art_btn, self.copy_art_btn):
+            b.setEnabled(False)
+
+        candidates = []
+        if a.texture and (a.texture + ".uexp") in self.reader:
+            candidates = [a.texture]
+        else:
+            bp = self.unit_bp.get(a.name)
+            if bp:
+                candidates = artchain.model_textures(self.reader, bp)
+        self._art_candidates = candidates
+
+        self.art_pick.blockSignals(True)
+        self.art_pick.clear()
+        self.art_pick.addItems([Path(c).name for c in candidates])
+        self.art_pick.setVisible(len(candidates) > 1)
+        self.art_pick.blockSignals(False)
+
+        if not candidates:
+            self.art.setText("no art")
+            return
+        self._show_art(candidates[0])
+
+    def _art_pick_changed(self, index):
+        """Preview a different texture from the model chain.
+
+        Args:
+            index (int): Position in the candidate list.
+        """
+        if 0 <= index < len(self._art_candidates):
+            self._show_art(self._art_candidates[index])
+
+    def _show_art(self, path):
+        """Decode and display one texture.
+
+        Args:
+            path (str): Archive path of the texture, without extension.
+        """
+        self._art_path = path
         try:
-            bulk_path = a.texture + ".ubulk"
+            bulk_path = path + ".ubulk"
             bulk = self.reader.read(bulk_path) if bulk_path in self.reader else b""
-            tex = texture.parse(self.reader.read(a.texture + ".uexp"), bulk)
+            tex = texture.parse(self.reader.read(path + ".uexp"), bulk)
             img = texture.to_image(tex)
             self._art_image = img
             data = img.tobytes("raw", "RGBA")
@@ -594,16 +644,19 @@ class MainWindow(QMainWindow):
             self.art.setPixmap(QPixmap.fromImage(qi).scaled(
                 QSize(430, 430), Qt.KeepAspectRatio, Qt.SmoothTransformation))
             edit = next((t for t in self.project.textures
-                         if t.texture_path == a.texture), None)
+                         if t.texture_path == path), None)
             pending = (edit.image_path or edit.source_texture) if edit else None
             self.art_info.setText(
-                f"{tex.width}x{tex.height} {tex.pixel_format}"
+                f"{Path(path).name}   {tex.width}x{tex.height} {tex.pixel_format}"
                 + (f", {len(tex.mips)} mips" if tex.is_block else "")
-                + (f"   <b style='color:{ACCENT}'>staged: {Path(pending).name}</b>" if pending else ""))
-            self.replace_art_btn.setEnabled(True); self.export_art_btn.setEnabled(True)
-            self.copy_art_btn.setEnabled(True)
+                + (f"   <b style='color:{ACCENT}'>staged: {Path(pending).name}</b>"
+                   if pending else ""))
+            for b in (self.replace_art_btn, self.export_art_btn, self.copy_art_btn):
+                b.setEnabled(True)
+        except ImportError as e:
+            self.art.setText(str(e)); self.art.setWordWrap(True)
         except Exception as e:
-            self.art.setText(f"cannot display art:\n{e}")
+            self.art.setText(f"cannot display art:\n{e}"); self.art.setWordWrap(True)
 
     def _load_values(self, a):
         """Show the asset's property values.
@@ -788,8 +841,8 @@ class MainWindow(QMainWindow):
         p, _ = QFileDialog.getOpenFileName(self, "Choose replacement art", "",
                                            "Images (*.png *.jpg *.jpeg *.bmp *.webp)")
         if p:
-            self.project.set_texture(a.texture, p)
-            self._refresh_edits(); self._load_art(a)
+            self.project.set_texture(self._art_path, image_path=p)
+            self._refresh_edits(); self._show_art(self._art_path)
 
     def _copy_art(self):
         """Replace this asset's art with another texture from the game.
@@ -810,8 +863,8 @@ class MainWindow(QMainWindow):
         if not src:
             QMessageBox.warning(self, "Not found", f"No texture named {pick}")
             return
-        self.project.set_texture(a.texture, source_texture=src)
-        self._refresh_edits(); self._load_art(a)
+        self.project.set_texture(self._art_path, source_texture=src)
+        self._refresh_edits(); self._show_art(self._art_path)
         self.statusBar().showMessage(f"art will be copied from {pick}", 8000)
 
     def _export_art(self):

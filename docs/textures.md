@@ -76,3 +76,36 @@ solves, but it is not implemented.
 
 Authoring a new skeletal mesh remains out of scope. See
 [unit graphics](unit-graphics.md).
+
+## Finding a unit's texture
+
+A card names its illustration directly. A unit does not: its appearance hangs
+off the Blueprint the summon card points at, and only 22 of 325 unit assets
+reference any texture at all. Those that do usually reference something
+incidental, which is a trap: the Gyrocopter imports `T_Unit_Notify_NoSteel`, the
+"out of steel" status icon, so taking the first texture an asset mentions showed
+a unit wearing a warning symbol.
+
+`cqmod/artchain.py` follows the real chain instead:
+
+```
+DA_Card_Summon_Human_Assassin
+  summonUnit -> BP_Unit_Assassin
+                  -> MI_Human_Assasin -> T_Human_Assasin_D
+  UnitData   -> DA_Unit_Human_Assassin
+```
+
+The unit does not name its own Blueprint, but the summon card names both, so the
+pairing is recovered from the cards. From there the walk follows materials and
+mesh material slots, because some Blueprints reach their art only through the
+mesh: the Gyrocopter's Blueprint imports shared placeholder materials from
+`Character_OLD`, and its real texture hangs off the `Dwarf_Gyrocopter` mesh.
+
+A Blueprint reaches several textures, so all of them are offered and ranked. A
+clear name match wins, otherwise the nearest one does. Both signals are needed:
+name alone picks a blood decal for the Assassin, whose texture is spelled
+`T_Human_Assasin_D` with one fewer `s` and shares no token with its Blueprint;
+depth alone picks an elephant for the Gyrocopter.
+
+322 of 325 units resolve at least one texture, and the editor lists them all so
+the guess can be overridden.

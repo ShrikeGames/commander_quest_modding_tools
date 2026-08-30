@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -268,6 +268,32 @@ def main():
           f"idx13={mv.properties[13].size} idx11={mv.properties[11].size}")
     zero_seen = any(e.zero_indices for a in assets for e in a.exports)
     check("zero-valued properties are decoded from the header bitmap", zero_seen)
+
+    print("\nmodel art chain:")
+    if um:
+        bps = artchain.unit_blueprints(r, assets, um)
+        units2 = [x for x in assets if x.class_name == "CMUnitData"]
+        resolved = sum(1 for u in units2
+                       if bps.get(u.name) and artchain.model_textures(r, bps[u.name]))
+        check("units resolve their model texture", resolved > len(units2) * 0.9,
+              f"{resolved}/{len(units2)}")
+        expected = {
+            "DA_Unit_Human_Assassin": "T_Human_Assasin_D",
+            "DA_Unit_Human_Cataphract": "T_Human_Cataphract",
+            "DA_Unit_Dwarf_Gyrocopter": "T_Dwarf_Gyrocopter_D",
+            "DA_Unit_Human_Archer": "T_Human_Archer",
+        }
+        wrong = []
+        for name, want_tex in expected.items():
+            bp = bps.get(name)
+            got = artchain.model_textures(r, bp) if bp else []
+            if not got or Path(got[0]).name != want_tex:
+                wrong.append(f"{name} -> {Path(got[0]).name if got else 'none'}")
+        check("the best guess is the unit's own texture", not wrong, "; ".join(wrong))
+        gyro = by.get("DA_Unit_Dwarf_Gyrocopter")
+        check("incidental textures are not treated as an asset's art",
+              not (gyro and gyro.texture),
+              "T_Unit_Notify_NoSteel is a status icon, not the Gyrocopter's skin")
 
     print("\nasset links:")
     card = by.get("DA_Card_Summon_Human_Assassin")

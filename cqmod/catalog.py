@@ -128,14 +128,23 @@ def _texture_package(pkg) -> str:
         the asset references no texture.
     """
     for imp in pkg.imports:
-        if imp.class_name == "Texture2D":
-            outer = imp.outer_index
-            if outer < 0:
-                oi = -outer - 1
-                if oi < len(pkg.imports):
-                    p = pkg.imports[oi].object_name
-                    if p.startswith("/Game/"):
-                        return "Commander/Content/" + p[len("/Game/"):]
+        if imp.class_name != "Texture2D":
+            continue
+        outer = imp.outer_index
+        if outer >= 0:
+            continue
+        oi = -outer - 1
+        if oi >= len(pkg.imports):
+            continue
+        p = pkg.imports[oi].object_name
+        if not p.startswith("/Game/"):
+            continue
+        path = "Commander/Content/" + p[len("/Game/"):]
+        # Only illustrations count as an asset's art. Assets reference textures
+        # incidentally too, and a unit importing a status icon such as
+        # T_Unit_Notify_NoSteel would otherwise be shown wearing it.
+        if path.startswith("Commander/Content/UI/ArtResources/"):
+            return path
     return ""
 
 
