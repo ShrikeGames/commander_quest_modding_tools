@@ -11,6 +11,7 @@ game data.
 | [GUI guide](gui-guide.md) | The editor, tab by tab |
 | [Finding fields](finding-fields.md) | How to locate the number you actually want to change |
 | [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
+| [Property names](property-names.md) | Recovering the real schema from the running game |
 | [Limitations](limitations.md) | What these tools cannot do, and why |
 
 ## Reference

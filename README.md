@@ -15,6 +15,7 @@ loads at startup.
 | **Edit text** | Titles and descriptions, via the localization resource |
 | **Edit art** | Replace card art with any PNG (auto-scaled and centre-cropped) |
 | **Edit values** | Overwrite integers in export payloads by offset |
+| **Named properties** | Real property names and types, recovered from the running game |
 | **Find fields** | Diff a card against its `+` upgrade variant to locate gameplay numbers |
 | **Build** | Compile staged edits into `ZZZ_<name>_P.pak` and install it |
 | **Manage mods** | List installed mods and enable or disable each one |
@@ -83,6 +84,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [GUI guide](docs/gui-guide.md) | The editor, tab by tab |
 | [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
 | [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
+| [Property names](docs/property-names.md) | Recovering the real schema from the running game |
 | [Architecture](docs/architecture.md) | Module map and data flow |
 | [Limitations](docs/limitations.md) | What these tools cannot do, and why |
 | [Reverse engineering notes](docs/reverse-engineering.md) | How the format was worked out |
@@ -127,11 +129,11 @@ row and a new asset, which changes byte lengths and therefore requires rewriting
 `.uasset` export tables with correct property serialization, which needs the class
 schema. Everything here edits existing assets instead.
 
-**Property names and types are unknown.** These packages are cooked with
-`PKG_UnversionedProperties`: property data is a presence bitmask against each class's
-declared property order rather than a self-describing stream. A `.usmap` would fix
-this, but generating one means walking the live `UClass`/`FProperty` graph in process
-memory. Until then, values are addressed by offset and identified by diffing.
+**Property names are recovered, but placement stops at variable-length data.**
+`schema/usmap.json` restores real names and types from the running game, so the
+editor shows `Count (IntProperty)` rather than an offset. Placement still stops at
+the first array or struct it cannot measure, leaving the tail of a card unresolved.
+See [property names](docs/property-names.md).
 
 **Only int32 values are editable.** Floats, enums, booleans and object references are
 visible in the raw view but have no dedicated editor yet.

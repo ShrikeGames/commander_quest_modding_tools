@@ -10,6 +10,7 @@ cqmod/mods.py        enable / disable installed mods
 cqmod/catalog.py     the asset index
 cqmod/diff.py        variant comparison / field finder
 cqmod/schema.py      solved property sizes per class
+cqmod/usmap.py       recovered property names and types
       |
 cqmod/uasset.py      package headers      cqmod/locres.py    localization
 cqmod/unversioned.py property headers     cqmod/texture.py   card art

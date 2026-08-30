@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 
 from datetime import datetime
 
-from cqmod import config, catalog, texture, locres, uasset, diff, mods
+from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap
 from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
@@ -69,6 +69,10 @@ class MainWindow(QMainWindow):
         self.project = Project()
         self.project_path: Path | None = None
         self.mods = ModManager(config.paks_dir(), config.mods_dir(), config.pak_path())
+        try:
+            self.usmap = usmap.Usmap.load()
+        except usmap.UsmapError:
+            self.usmap = None
         self._payload = b""
 
         self._build_ui()
@@ -208,12 +212,9 @@ class MainWindow(QMainWindow):
 
         # --- Values ---
         page = QWidget(); lay = QVBoxLayout(page)
-        hint = QLabel(
-            "Integer slots inside each export payload. Property <i>names</i> need a "
-            ".usmap, so these are addressed by offset. Identify a field by comparing "
-            "a card with its '+' upgrade variant, then edit here.")
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
+        self.values_hint = QLabel()
+        self.values_hint.setWordWrap(True)
+        lay.addWidget(self.values_hint)
         row = QHBoxLayout()
         self.find_btn = QPushButton("Find fields vs '+' variant")
         self.find_btn.setToolTip(
@@ -221,14 +222,20 @@ class MainWindow(QMainWindow):
             "are almost always the gameplay numbers.")
         self.find_btn.clicked.connect(self._find_fields)
         self.find_btn.setEnabled(False)
+        self.raw_mode = QCheckBox("Raw bytes")
+        self.raw_mode.setToolTip(
+            "List every byte offset interpreted as an integer, instead of named "
+            "properties. Useful where the schema cannot place a property.")
+        self.raw_mode.toggled.connect(lambda _: self.current and self._load_values(self.current))
+        row.addWidget(self.raw_mode)
         self.only_cand = QCheckBox("Show only candidates")
         self.only_cand.toggled.connect(lambda _: self.current and self._load_values(self.current))
         self.only_cand.setEnabled(False)
         row.addWidget(self.find_btn); row.addWidget(self.only_cand); row.addStretch()
         lay.addLayout(row)
-        self.values = QTableWidget(0, 5)
+        self.values = QTableWidget(0, 6)
         self.values.setHorizontalHeaderLabels(
-            ["Export", "Class", "Offset", "Value", "New value"])
+            ["Export", "Property", "Type", "Offset", "Value", "New value"])
         self.values.verticalHeader().setVisible(False)
         self.values.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.values.itemChanged.connect(self._value_changed)
@@ -515,12 +522,13 @@ class MainWindow(QMainWindow):
             self.art.setText(f"cannot display art:\n{e}")
 
     def _load_values(self, a):
-        """List the integer slots in an asset's export payloads.
+        """Show the asset's property values.
 
-        Offsets advance one byte at a time rather than four: real property
-        layouts interleave smaller types, so a four-byte stride silently skips
-        fields. Candidates from the field finder are highlighted, and staged
-        edits are shown in the accent colour.
+        With the recovered schema each row is a named property placed at its
+        real offset. Without it, or in raw mode, the table falls back to listing
+        every byte offset interpreted as an integer, stepping one byte at a time
+        because property layouts interleave sizes and a four-byte stride skips
+        real fields.
 
         Args:
             a (cqmod.catalog.Asset): The selected asset.
@@ -531,34 +539,64 @@ class MainWindow(QMainWindow):
             self._payload = self.reader.read(a.uexp)
         except Exception:
             self._payload = b""
+
+        named = bool(self.usmap) and not self.raw_mode.isChecked()
         rows = []
-        for e in a.exports:
-            start = e.start + e.header_bytes
-            end = min(e.end, len(self._payload))
-            for off in range(start, max(start, end - 3)):
-                (v,) = struct.unpack_from("<i", self._payload, off)
-                rows.append((e.index, e.class_name, off, v))
+        if named:
+            for e in a.exports:
+                for f in self.usmap.place(e, self._payload):
+                    rows.append((e.index, f.name, f.type, f.offset, f.value, f.editable))
+            if not rows:
+                named = False
+        if not named:
+            for e in a.exports:
+                start = e.start + e.header_bytes
+                end = min(e.end, len(self._payload))
+                for off in range(start, max(start, end - 3)):
+                    (v,) = struct.unpack_from("<i", self._payload, off)
+                    rows.append((e.index, e.class_name, "", off, v, True))
+
+        if self.usmap is None:
+            self.values_hint.setText(
+                "No property schema loaded, so values are addressed by byte offset. "
+                "Launch the game and run <tt>tools/usmap/dump.py</tt> to recover "
+                "property names.")
+        elif named:
+            self.values_hint.setText(
+                "Named properties recovered from the game's own reflection data. "
+                "Rows marked <i>zero</i> are stored in the header bitmap and occupy "
+                "no bytes; placement stops at the first variable-length property.")
+        else:
+            self.values_hint.setText(
+                "Raw byte offsets, each read as a 32-bit integer. Offsets advance one "
+                "byte at a time because property layouts interleave sizes.")
+
         cand = getattr(self, "_candidates", {})
         if cand and self.only_cand.isChecked():
-            rows = [r for r in rows if r[2] in cand]
+            rows = [r for r in rows if r[3] in cand]
+        staged = {v.offset: v.value for v in self.project.values if v.asset_path == a.path}
         self.values.setRowCount(len(rows))
-        staged = {v.offset: v.value for v in self.project.values
-                  if v.asset_path == a.path}
-        for r, (ei, cls, off, v) in enumerate(rows):
-            for c, text in ((0, f"+{ei}"), (1, cls), (2, str(off)), (3, str(v))):
+        for r, (ei, name, typ, off, val, editable) in enumerate(rows):
+            cells = [f"+{ei}", name, typ,
+                     str(off) if off >= 0 else "zero",
+                     "" if val is None else str(val)]
+            for c, text in enumerate(cells):
                 it = QTableWidgetItem(text)
                 it.setFlags(it.flags() & ~Qt.ItemIsEditable)
                 self.values.setItem(r, c, it)
             if off in cand:
-                self.values.item(r, 3).setText(f"{v}   (variant: {cand[off]})")
-                for c in range(4):
+                self.values.item(r, 4).setText(f"{val}   (variant: {cand[off]})")
+                for c in range(5):
                     self.values.item(r, c).setBackground(QColor("#2d4f1e"))
                     self.values.item(r, c).setForeground(QColor("#d9f2c8"))
             new = QTableWidgetItem("" if off not in staged else str(staged[off]))
             new.setData(Qt.UserRole, off)
+            if not editable or off < 0:
+                new.setFlags(new.flags() & ~Qt.ItemIsEditable)
             if off in staged:
-                new.setBackground(QColor(ACCENT)); new.setForeground(QColor("white"))
-            self.values.setItem(r, 4, new)
+                new.setBackground(QColor(ACCENT))
+                new.setForeground(QColor("white"))
+            self.values.setItem(r, 5, new)
         self.values.resizeColumnsToContents()
         self.values.blockSignals(False)
 
@@ -600,11 +638,14 @@ class MainWindow(QMainWindow):
         self.only_cand.setEnabled(bool(found))
         self.only_cand.setChecked(bool(found))
         self._load_values(a)
+        skipped = ""
+        if not found.fully_comparable:
+            skipped = (f"; {len(found.skipped)} export(s) could not be compared "
+                       "because the two assets set different properties")
         self.statusBar().showMessage(
-            f"{len(found)} candidate field(s) differ from {b.name}"
+            f"{len(found)} candidate field(s) differ from {b.name}{skipped}"
             if found else
-            f"no integer fields differ from {b.name} (the upgrade may change text "
-            "or add an effect instead)", 9000)
+            f"no integer fields differ from {b.name}{skipped}", 9000)
 
     # ------------------------------------------------------------ edits
     def _stage_text(self):
@@ -653,7 +694,7 @@ class MainWindow(QMainWindow):
         Args:
             item (QTableWidgetItem): The edited cell.
         """
-        if item.column() != 4 or not self.current:
+        if item.column() != 5 or not self.current:
             return
         off = item.data(Qt.UserRole)
         text = item.text().strip()

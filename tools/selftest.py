@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -138,6 +138,32 @@ def main():
     ml = locres.load(m.read(LOC))
     check("built locres carries the new title",
           ml.get("ST_Card_Supply", "Insight_Title") == "Pot of Greed")
+    print("\nrecovered property names:")
+    try:
+        um = usmap.Usmap.load()
+    except usmap.UsmapError as e:
+        check("property schema is present", False, str(e))
+        um = None
+    if um:
+        check("schema covers the card and effect classes",
+              "CMCardData_Supply" in um and "CMEffectData_MoveCard" in um)
+        names = [p["name"] for p in um.properties("CMCardData_Supply")]
+        check("card property order matches the serializer",
+              [names[i] for i in (0, 1, 7, 11, 16, 19)] ==
+              ["cardName", "CardDesc", "CardIllustration", "UsingSound",
+               "UseEffects", "EnhancedCardData"],
+              str([names[i] for i in (0, 1, 7, 11, 16, 19)]))
+        card = by["DA_Card_Supply_Human_Insight"]
+        pl = r.read(card.uexp)
+        placed = [f for e in card.exports for f in um.place(e, pl)]
+        counts = [f for f in placed if f.name == "Count"]
+        check("Count lands on the offsets found by hand",
+              sorted(f.offset for f in counts) == [104, 119],
+              str(sorted(f.offset for f in counts)))
+        zeroed = [f for f in placed if f.offset == -1]
+        check("zero-valued properties are reported as such",
+              any(f.name == "PileLocation" for f in zeroed))
+
     print("\nproperty schema:")
     layouts = schema.build(r, assets)
     solved = sum(l.solved_count for l in layouts.values())
