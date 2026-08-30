@@ -323,19 +323,27 @@ class Usmap:
             n = struct.unpack_from("<i", payload, cursor)[0]
             # Containers serialize as a count followed by their elements, so the
             # element width gives the size outright once the type is known.
-            if 0 <= n <= 4096:
-                if t == "StructProperty" and p.get("struct") == TAG_CONTAINER:
-                    return [4 + 8 * n]
-                if t in ("ArrayProperty", "SetProperty"):
-                    w = SERIALIZED_SIZE.get(p.get("inner", ""))
-                    if w:
-                        return [4 + w * n]
-            fixed = self.sizes.get((export.class_name, idx))
-            if fixed is not None:
-                return [fixed]
             if not 0 <= n <= 4096:
-                return []
-            return [4 + n * w for w in (8, 4, 16, 1, 12, 32)]
+                fixed = self.sizes.get((export.class_name, idx))
+                return [fixed] if fixed is not None else []
+            # The element width the schema implies comes first, but the other
+            # plausible widths stay available: the search keeps whichever makes
+            # the payload add up, so an unusual asset still resolves instead of
+            # failing outright.
+            widths = [8, 4, 16, 1, 12, 32, 24]
+            if t == "StructProperty" and p.get("struct") == TAG_CONTAINER:
+                first = 8
+            elif t in ("ArrayProperty", "SetProperty"):
+                first = SERIALIZED_SIZE.get(p.get("inner", ""), 4)
+            else:
+                first = None
+            if first is not None:
+                widths = [first] + [w for w in widths if w != first]
+            out = [4 + n * w for w in widths]
+            fixed = self.sizes.get((export.class_name, idx))
+            if fixed is not None and fixed not in out:
+                out.append(fixed)
+            return out
 
         def search(i, cursor, acc):
             """Find a layout that consumes the value region exactly.
