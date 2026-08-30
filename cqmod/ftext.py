@@ -9,7 +9,7 @@ strings. They serialize as::
     FString Key           e.g. 'Insight_Title'
 
 The key is looked up in the string table at runtime, and localized through
-``Game.locres`` -- so editing card text means editing the locres, not the asset.
+``Game.locres``, so editing card text means editing the locres, not the asset.
 See :mod:`cqmod.locres`.
 """
 from __future__ import annotations

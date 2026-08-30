@@ -21,7 +21,7 @@ Searching the shipped binaries found **nothing**:
 |---|---|---|
 | `CommanderGame-Win64-Shipping.exe`, 150,916,096 bytes, every byte offset | 224 | none |
 | base64-encoded forms (how `Crypto.json` stores it) | 44 | none |
-| every bundled DLL — D3D12, DirectML, Aftermath, MsQuic | 63 | none |
+| every bundled DLL (D3D12, DirectML, Aftermath, MsQuic) | 63 | none |
 
 So **the key is assembled at runtime rather than stored**. Reading the live
 process found it immediately, at `0x34ab110` in anonymous memory, within the
@@ -38,7 +38,7 @@ suspicious of. Three lines of evidence settled it.
 **The codec is Kraken, exclusively.** Sampling 4,000 compressed entries: 3,993
 Kraken with no checksums, and 7 header reads that failed for unrelated reasons.
 Not Leviathan, not Hydra, nothing recent. Kraken's bitstream dates to 2016 and is
-frozen — it has to be, since every game shipped with it must stay decodable. A
+frozen. It has to be, since every game shipped with it must stay decodable. A
 decoder frozen for seven years is targeting a format frozen for nine.
 
 **The bundled reference vectors decode.** `dickens.kraken` produces 10,192,446
@@ -54,8 +54,8 @@ magic. Zero failures.
 Upstream is a Visual Studio project. Two changes are needed, both expressed as
 Makefile steps so the vendored sources stay pristine:
 
-1. Cut `kraken.cpp` before `typedef int WINAPI OodLZ_CompressFunc(` — everything
-   after is the Windows CLI, DLL loading and `main`.
+1. Cut `kraken.cpp` before `typedef int WINAPI OodLZ_CompressFunc(`. Everything
+   after it is the Windows CLI, DLL loading and `main`.
 2. Replace `stdafx.h` with `ooz_linux.h`, which supplies the typedefs and shims
    `_BitScanReverse`, `_BitScanForward` and the `_byteswap_*` builtins.
 
@@ -74,7 +74,7 @@ exports: (DependsOffset - ExportOffset) / ExportCount = (1893 - 1605) /  3 = 96
 ```
 
 An earlier guess of 100 bytes for exports parsed the first export correctly and
-turned the rest into nonsense — a failure mode worth recognising.
+turned the rest into nonsense, which is a failure mode worth recognising.
 
 ## Two mistakes worth remembering
 
@@ -92,7 +92,7 @@ coming out 15 KB smaller than the original. See
 ## What the name pool showed
 
 An exploratory memory scan decoded the game's `FName` pool, where the card class
-family is plainly visible — `CMCardData` with `_Curse`, `_Power`, `_Summon`,
+family is plainly visible: `CMCardData` with `_Curse`, `_Power`, `_Summon`,
 `_Supply` and `_Tactics`, alongside function names like `GetDisplayUseCost` and
 `GetCardRarity`.
 

@@ -6,7 +6,7 @@ and resolving those against the localization resource.
 
 None of this needs a ``.usmap``: the class comes from the import table and text
 keys are self-describing, so everything shown in the browser is fully
-recoverable. Numeric property *values* are a different matter -- they are
+recoverable. Numeric property *values* are a different matter. They are
 addressed by byte offset, see :mod:`cqmod.unversioned` and :mod:`cqmod.diff`.
 
 Indexing the whole game takes roughly a tenth of a second, so the catalog is

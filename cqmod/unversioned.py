@@ -2,9 +2,9 @@
 
 Cooked packages here set ``PKG_UnversionedProperties``. Instead of a
 self-describing name/type stream, each export's payload starts with a run-length
-bitmap saying *which* property indices -- positions in the class's declared
-property order -- carry a value. The values themselves then follow in index
-order, with no type tags.
+bitmap saying *which* property indices carry a value, where an index is a
+position in the class's declared property order. The values themselves then
+follow in index order, with no type tags.
 
 Without a ``.usmap`` we can therefore see which indices are set and where the
 value bytes begin, but not property names or types. That is still enough to

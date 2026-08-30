@@ -37,7 +37,7 @@ as `CQMOD_GAME_DIR` and `CQMOD_AES_KEY`.
 ## Recovering the pak key
 
 The archive's index is AES-256 encrypted. **The key is assembled at runtime and
-is not present in any shipped binary** — exhaustive byte-aligned scans of the
+is not present in any shipped binary.** Exhaustive byte-aligned scans of the
 150 MB executable and every bundled DLL find nothing. It has to be read out of
 live process memory.
 
@@ -58,7 +58,7 @@ If it reports a permission error, Linux is restricting `ptrace`:
 sudo sysctl -w kernel.yama.ptrace_scope=0    # revert with =1
 ```
 
-That setting is a hardening measure — turn it back on when you are done.
+That setting is a hardening measure, so turn it back on when you are done.
 
 ## Checking the setup
 
@@ -77,7 +77,7 @@ should pass before you rely on anything else.
 python3 ui/app.py
 ```
 
-1. Search for a card — `Insight` is a good first target.
+1. Search for a card. `Insight` is a good first target.
 2. On the **Text** tab, change the title and press *Stage text change*.
 3. On the **Values** tab, press *Find fields vs '+' variant*. For Insight this
    narrows 100 integer slots to exactly two: offsets 104 and 119.
@@ -85,10 +85,10 @@ python3 ui/app.py
 5. Press **Build & Install Mod** and restart the game.
 
 To uninstall, delete the `ZZZ_*_P.pak` from `Commander/Content/Paks/`. Nothing
-else on disk is ever modified — the base archive is only ever read.
+else on disk is ever modified, and the base archive is only ever read.
 
 ## A note on Steam
 
 The mod pak is a file Steam does not know about. *Verify integrity of game
 files* should leave it alone or remove it, rather than re-downloading the 3.5 GB
-archive — but delete the mod first if you want a guaranteed-clean check.
+archive, but delete the mod first if you want a guaranteed-clean check.

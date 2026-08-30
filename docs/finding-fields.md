@@ -70,7 +70,7 @@ Across all **281** base/variant pairs in the game:
 | 1 | 87 |
 | 2 | 29 |
 | 3 | 12 |
-| 4–6 | 11 |
+| 4 to 6 | 11 |
 
 Median 0, mean 0.8, maximum 6. Some worked examples:
 
@@ -84,7 +84,7 @@ Median 0, mean 0.8, maximum 6. Some worked examples:
 
 142 pairs yield no candidates. The upgrade changes something the diff cannot
 see: text only, an added effect object, a float, an enum, or a boolean. Fall
-back to reading the raw value list and reasoning from the export classes — an
+back to reading the raw value list and reasoning from the export classes. An
 export named `CMEffectData_AddResource` in a card that grants resources is a
 strong hint about which numbers matter.
 

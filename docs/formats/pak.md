@@ -13,7 +13,7 @@ Implemented in [`cqmod/pak.py`](../../cqmod/pak.py).
 | Mount point | `../../../` |
 | Index | AES-256-ECB encrypted, `EncryptionKeyGuid` all zero |
 | Compression | Oodle **Kraken**, no checksums |
-| Entry data | not encrypted — only 71 of 27,932 entries set the per-entry flag |
+| Entry data | not encrypted; only 71 of 27,932 entries set the per-entry flag |
 | Signing | none, no `.sig` present |
 
 Note that the *index* is encrypted but the *data* is not. That distinction
@@ -56,7 +56,7 @@ int32   NumFilesWithNonEncodableEntries
 ```
 
 UE accepts either index kind. `build_pak` writes only the full directory index,
-which keeps the writer simple — the path hash index would require reproducing
+which keeps the writer simple. The path hash index would require reproducing
 UE's `FCrc::StrCrc32` seeded hash.
 
 ## Full directory index
@@ -85,8 +85,8 @@ bits 6-21   compression block count
 bits 0-5    block size >> 11, or 0x3F meaning "read an explicit uint32"
 ```
 
-`build_pak` always emits `0xC0000000` — stored, 32-bit offset and size, no
-blocks — which is 12 bytes per entry.
+`build_pak` always emits `0xC0000000`, meaning stored with a 32-bit offset and
+size and no blocks, which is 12 bytes per entry.
 
 ## Inline entry header
 

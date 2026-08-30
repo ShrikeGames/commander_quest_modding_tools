@@ -3,7 +3,7 @@
 Implemented in [`cqmod/locres.py`](../../cqmod/locres.py).
 
 Card titles and descriptions are not stored in the card asset. The asset holds a
-string-table reference — a namespace and a key — and the text itself lives in
+string-table reference, meaning a namespace and a key, and the text itself lives in
 `Commander/Content/Localization/Game/<locale>/Game.locres`.
 
 So **editing card text means editing the locres**, not the asset. That is
@@ -57,8 +57,8 @@ byte-identical. `locres.save` does exactly that, so an unedited resource
 round-trips byte-for-byte.
 
 Identical text is deduplicated, so several keys may share one array index.
-`Locres.set` detects this and *splits* the entry — appending a new string and
-repointing only the requested key — rather than silently changing every key that
+`Locres.set` detects this and *splits* the entry, appending a new string and
+repointing only the requested key, rather than silently changing every key that
 shared it.
 
 ## The ANSI trap
@@ -70,8 +70,8 @@ mojibake. Non-ASCII text must be written as UTF-16LE with a *negative* length.
 
 This is not hypothetical. The first version of the "Pot of Greed" build wrote
 everything as UTF-8; the resource came out 15 KB smaller than the original,
-which was the clue. Fifty-two strings elsewhere in the game — nothing to do with
-the card being edited — would have been corrupted.
+which was the clue. Fifty-two strings elsewhere in the game, none of them anything
+to do with the card being edited, would have been corrupted.
 
 The correct rule, in `_wr_string`:
 

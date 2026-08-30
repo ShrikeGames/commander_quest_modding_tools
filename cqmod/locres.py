@@ -3,8 +3,8 @@
 The file is a magic and version, an ``int64`` offset to the string array, an
 entry count, then a namespace/key table whose leaves index into that array. The
 string array sits last, so retargeting strings only requires rewriting the tail
-while the recorded array offset stays valid -- which is exactly what :func:`save`
-does, leaving the namespace table byte-identical.
+while the recorded array offset stays valid. That is exactly what :func:`save`
+does, and it leaves the namespace table byte-identical.
 
 .. warning::
    UE deserializes a positive-length ``FString`` as **ANSI**, not UTF-8. Writing

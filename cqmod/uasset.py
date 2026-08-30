@@ -4,9 +4,9 @@ Only what the tools need is decoded: the name table, the import and export
 tables, and enough of the summary to locate each export's payload inside the
 paired ``.uexp``.
 
-A cooked package is split in two. The ``.uasset`` holds the header -- names,
-imports, exports and their offsets -- and the ``.uexp`` holds the serialized
-property data those exports point at. Export offsets are absolute from the start
+A cooked package is split in two. The ``.uasset`` holds the header, meaning the
+name table, the imports, the exports and their offsets. The ``.uexp`` holds the
+serialized property data those exports point at. Export offsets are absolute from the start
 of the *logical* package, so subtracting :attr:`Package.header_size` converts
 them to ``.uexp`` offsets; :meth:`Export.uexp_slice` does that for you.
 

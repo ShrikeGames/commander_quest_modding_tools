@@ -2,8 +2,8 @@
 
 Implemented in [`cqmod/uasset.py`](../../cqmod/uasset.py).
 
-A cooked package is split across two files. The `.uasset` holds the header —
-name table, imports, exports and their offsets — and the `.uexp` holds the
+A cooked package is split across two files. The `.uasset` holds the header: the
+name table, the imports, the exports and their offsets. The `.uexp` holds the
 serialized property data those exports point at.
 
 ## Summary header
@@ -34,7 +34,7 @@ Package flags on these assets are `0x80002200`:
 | | |
 |---|---|
 | `0x80000000` | `PKG_FilterEditorOnly` |
-| `0x00002000` | `PKG_UnversionedProperties` — see [unversioned properties](unversioned.md) |
+| `0x00002000` | `PKG_UnversionedProperties`, see [unversioned properties](unversioned.md) |
 | `0x00000200` | `PKG_Cooked` |
 
 ## Name table
@@ -42,7 +42,7 @@ Package flags on these assets are `0x80002200`:
 Each entry is an `FString` followed by four bytes of name hashes. A positive
 length means single-byte characters; negative means UTF-16LE.
 
-The name table is informative on its own — it lists every class, asset and string
+The name table is informative on its own. It lists every class, asset and string
 key the package references, which is how the class of a card can be identified
 without decoding any property data.
 
@@ -76,7 +76,7 @@ indexes imports, zero is null.
 ## Locating export payloads
 
 `SerialOffset` is absolute from the start of the *logical* package, so it
-includes the header. Subtract `TotalHeaderSize` to get a `.uexp` offset —
+includes the header. Subtract `TotalHeaderSize` to get a `.uexp` offset;
 `Export.uexp_slice()` does this.
 
 A good integrity check, used by the self-test: export payload sizes must tile the

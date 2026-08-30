@@ -50,15 +50,15 @@ Project (TextEdit / TextureEdit / ValueEdit)
 ```
 
 The writer deliberately does *not* encrypt or compress. UE accepts both plain
-forms, so nothing about building a mod requires the key or an Oodle compressor —
-those exist purely to read the original.
+forms, so nothing about building a mod requires the key or an Oodle compressor.
+Those exist purely to read the original.
 
 ## Why edits preserve byte length
 
 A cooked package is split in two. The `.uasset` holds the export table, which
 records each export's `SerialOffset` and `SerialSize` into the `.uexp`. Change a
 payload's length and every subsequent offset shifts, so the `.uasset` must be
-rewritten too — and doing that correctly means understanding the property
+rewritten too. Doing that correctly means understanding the property
 serialization, which needs a `.usmap`.
 
 All three edit kinds sidestep this:

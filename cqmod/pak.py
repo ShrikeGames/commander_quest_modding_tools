@@ -142,8 +142,8 @@ class PakReader:
                 index is encrypted; mod paks written by :func:`build_pak` are not.
 
         Raises:
-            PakError: If the file is not a pak, or a hash check fails -- most
-                often meaning the key is wrong.
+            PakError: If the file is not a pak, or a hash check fails, which
+                most often means the key is wrong.
             OSError: If the file cannot be opened.
         """
         self.path = Path(path)

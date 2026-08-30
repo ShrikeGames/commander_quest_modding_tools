@@ -1,8 +1,8 @@
 """Locating meaningful fields by comparing two assets.
 
-Without a ``.usmap`` the tools cannot name properties -- but the game ships
-upgraded ``+`` variants of most cards, and a variant differs from its base
-almost exclusively in the values that matter. Diffing the two therefore points
+Without a ``.usmap`` the tools cannot name properties. The game does ship
+upgraded ``+`` variants of most cards, though, and a variant differs from its
+base almost exclusively in the values that matter. Diffing the two therefore points
 straight at the gameplay numbers.
 
 Two filters make the result usable. Text spans are excluded, because a card and

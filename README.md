@@ -1,8 +1,8 @@
 # Commander Quest Modding Tools
 
-Browse and edit the data assets of [Commander Quest](https://store.steampowered.com/app/2697930/)
-— cards, units, gear and commanders — and compile changes into a mod pak the
-game loads at startup.
+Browse and edit the data assets of [Commander Quest](https://store.steampowered.com/app/2697930/):
+cards, units, gear and commanders. Compile the changes into a mod pak the game
+loads at startup.
 
 ![status](https://img.shields.io/badge/status-working%20proof%20of%20concept-B03A0B)
 
@@ -28,7 +28,8 @@ pip install -r requirements.txt          # cryptography, Pillow, PySide6
 sudo apt install build-essential libssl-dev   # to build the Oodle decoder
 ```
 
-Create `cqmod_config.local.json` (gitignored — it holds a key specific to your copy):
+Create `cqmod_config.local.json`, which is gitignored because it holds a key
+specific to your copy:
 
 ```json
 {
@@ -64,8 +65,9 @@ To uninstall, delete the `ZZZ_*_P.pak` from `Commander/Content/Paks/`.
 Property *names* are not recoverable without a `.usmap` (see below), so values are
 addressed by byte offset. The **Find fields vs '+' variant** button does the work:
 it diffs a card against its upgraded variant, filters out text and misaligned reads,
-and usually leaves one or two offsets — the gameplay numbers. Across all 281 variant
-pairs in the game the median result is 0 candidates and the maximum is 6.
+and usually leaves one or two offsets, which are the gameplay numbers. Across
+all 281 variant pairs in the game the median result is 0 candidates and the
+maximum is 6.
 
 ## Documentation
 
@@ -107,8 +109,8 @@ Three facts make this tractable:
 2. **Length-preserving edits need no export-table surgery.** If a patched `.uexp`
    keeps its exact byte length, the paired `.uasset` stays valid untouched. Every
    edit type here preserves length.
-3. **Card art is `PF_B8G8R8A8`** — uncompressed 32-bit BGRA, single mip. Custom art
-   needs no BC7/DXT encoder.
+3. **Card art is `PF_B8G8R8A8`**, uncompressed 32-bit BGRA with a single mip.
+   Custom art needs no BC7/DXT encoder.
 
 ## Limitations
 
@@ -116,7 +118,7 @@ See [docs/limitations.md](docs/limitations.md) for the full picture.
 
 **Adding genuinely new assets is not supported.** A new card needs a new `DT_Cards`
 row and a new asset, which changes byte lengths and therefore requires rewriting
-`.uasset` export tables with correct property serialization — which needs the class
+`.uasset` export tables with correct property serialization, which needs the class
 schema. Everything here edits existing assets instead.
 
 **Property names and types are unknown.** These packages are cooked with
@@ -128,7 +130,7 @@ memory. Until then, values are addressed by offset and identified by diffing.
 **Only int32 values are editable.** Floats, enums, booleans and object references are
 visible in the raw view but have no dedicated editor yet.
 
-**Linux only** so far — the Oodle decoder builds with GCC, and the key finder reads
+**Linux only** so far. The Oodle decoder builds with GCC, and the key finder reads
 `/proc/<pid>/mem`.
 
 ## Licence

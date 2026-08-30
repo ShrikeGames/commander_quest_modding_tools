@@ -7,9 +7,9 @@ property of how the game cooks it.
 
 ## The format
 
-Card images are **`PF_B8G8R8A8`** — uncompressed 32-bit BGRA, a single mip, no
-mip chain. There is no BC7/DXT block compression to encode, so importing custom
-art is a resize and a channel swap.
+Card images use **`PF_B8G8R8A8`**, meaning uncompressed 32-bit BGRA with a single
+mip and no mip chain. There is no BC7/DXT block compression to encode, so
+importing custom art is a resize and a channel swap.
 
 A representative card:
 
@@ -21,8 +21,8 @@ T_Image_Card_Supply_Human_Insight.uexp   4,160,153 bytes
 
 ## Locating the pixels
 
-Rather than walking the property stream — which would need a `.usmap` — the
-parser anchors on the pixel-format string:
+Rather than walking the property stream, which would need a `.usmap`, the parser
+anchors on the pixel-format string:
 
 ```
 int32   SizeX               1040
@@ -37,7 +37,7 @@ uint32  PackageTag          0x9E2A83C1
 ```
 
 The computed span is then checked against the payload's actual length. A
-mismatch — which is what a mipmapped texture looks like — raises `TextureError`
+mismatch, which is what a mipmapped texture looks like, raises `TextureError`
 rather than corrupting the file.
 
 ## Replacing art
@@ -60,7 +60,7 @@ length means it needs no edits at all.
 ## Extracting art
 
 `texture.to_png_bytes(tex)` returns a PIL image with channels swapped back to
-RGBA. Despite the name it returns an image object, not encoded bytes — call
+RGBA. Despite the name it returns an image object, not encoded bytes, so call
 `.save(path)` on it. The GUI exposes this as *Export PNG…*, which is the easy way
 to get a base to paint over.
 
@@ -68,4 +68,4 @@ to get a base to paint over.
 
 Only `PF_B8G8R8A8` is supported. Block-compressed formats would need a BC
 encoder, and mipmapped textures would need the whole chain regenerated and the
-payload length recomputed — which would in turn mean rewriting the `.uasset`.
+payload length recomputed, which would in turn mean rewriting the `.uasset`.

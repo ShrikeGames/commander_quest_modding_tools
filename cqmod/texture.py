@@ -1,8 +1,8 @@
 """Reading and replacing ``Texture2D`` payloads.
 
-Commander Quest's card art is ``PF_B8G8R8A8`` -- uncompressed 32-bit BGRA, a
-single mip, no mip chain. That is unusually convenient: importing custom art
-needs no BC7/DXT encoder, just a resize and a channel swap.
+Commander Quest's card art uses ``PF_B8G8R8A8``, meaning uncompressed 32-bit
+BGRA with a single mip and no mip chain. That is unusually convenient: importing
+custom art needs no BC7/DXT encoder, just a resize and a channel swap.
 
 Keeping the image dimensions identical keeps the ``.uexp`` byte length
 identical, which in turn means the paired ``.uasset`` export table stays valid
@@ -73,7 +73,7 @@ def parse(uexp: bytes) -> Texture:
 
     Raises:
         TextureError: If the format is not :data:`SUPPORTED_FORMAT`, or if the
-            computed pixel span does not account for the whole payload -- which
+            computed pixel span does not account for the whole payload, which
             is what a mipmapped texture looks like here.
     """
     marker = SUPPORTED_FORMAT.encode()

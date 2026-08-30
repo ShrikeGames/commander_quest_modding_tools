@@ -2,8 +2,8 @@
 """Recover the pak index AES key from the running game.
 
 The key is assembled at runtime rather than stored, so scanning the shipped
-binaries finds nothing -- it has to be read out of live process memory. Each
-candidate is confirmed by decrypting the entire index and comparing SHA-1
+binaries finds nothing. It has to be read out of live process memory instead.
+Each candidate is confirmed by decrypting the entire index and comparing SHA-1
 against the pak footer's hash, so a reported key is proven, not guessed.
 
     1. launch Commander Quest
@@ -87,7 +87,7 @@ def main():
 
     pid = args.pid or find_pid()
     if not pid:
-        sys.exit(f"No running {PROC_NAME} found -- launch the game first.")
+        sys.exit(f"No running {PROC_NAME} found. Launch the game first.")
 
     finder = FINDER_DIR / "aes_finder"
     if not finder.is_file():

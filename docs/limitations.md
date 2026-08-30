@@ -7,7 +7,7 @@ These tools **edit existing assets**. They cannot create a new card.
 A new card needs a new row in `DT_Cards` and a new `DA_Card_*` asset. Both change
 byte lengths, which means rewriting `.uasset` export tables with correct
 `SerialOffset`/`SerialSize` values *and* emitting valid unversioned property data
-for the target class — which requires knowing that class's property order and
+for the target class, which requires knowing that class's property order and
 types. That is precisely what a `.usmap` provides and we do not have one.
 
 The practical workaround is to repurpose a card you do not mind losing: change
@@ -41,8 +41,8 @@ most rows in it are meaningless.
 
 ## Textures must keep their dimensions and format
 
-Only `PF_B8G8R8A8` is handled — uncompressed BGRA with a single mip, which is
-what the card art happens to use. Block-compressed or mipmapped textures raise a
+Only `PF_B8G8R8A8` is handled, meaning uncompressed BGRA with a single mip, which
+is what the card art happens to use. Block-compressed or mipmapped textures raise a
 clear error rather than being silently corrupted. Replacement art is scaled and
 centre-cropped to the original dimensions, because changing them would change the
 payload length.
@@ -63,5 +63,5 @@ The pak and asset code is portable; the native pieces are not, yet.
 
 Every `ValueEdit` is an offset into a specific build's asset. After a game update
 those offsets may point somewhere else entirely. Project files are JSON and
-readable, so re-deriving them with the field finder is quick — but do check a mod
+readable, so re-deriving them with the field finder is quick, but do check a mod
 still does what you meant after an update.
