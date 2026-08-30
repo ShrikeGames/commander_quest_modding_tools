@@ -10,9 +10,16 @@ Two kinds of texture exist in this game and they need different handling.
 | Card art | `PF_B8G8R8A8`, single mip, no bulk file | card illustrations |
 | Unit and world art | `PF_DXT1` (753) or `PF_DXT5` (122), full mip chain | models, tiles, effects |
 
-892 of the 900 textures in the game parse. The eight that do not are
-uncompressed textures that carry a mip chain, a combination the single-mip path
-does not handle.
+Both use the same mip chain layout, so both take the same path through the
+parser. Card art usually has a single level, but not always: several
+illustrations, including the special sheep cards, are 1024x1024 with eleven
+levels split across a `.ubulk`. Treating uncompressed art as necessarily
+single-mip broke exactly those.
+
+All 638 card illustrations parse, and 2,311 textures across the game. The 155
+that do not are engine assets rather than art: cube maps, volume textures, BRDF
+lookup tables, and level lightmap data whose bulk files are shared between
+textures.
 
 ## Where the pixels live
 

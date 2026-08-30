@@ -94,6 +94,24 @@ class Texture:
         return self.width * self.height * 4
 
 
+def mip_size(width: int, height: int, fmt: str) -> int:
+    """Bytes one mip level occupies in a given format.
+
+    Args:
+        width (int): Mip width.
+        height (int): Mip height.
+        fmt (str): Pixel format.
+
+    Returns:
+        int: Encoded size. Uncompressed formats are four bytes per pixel;
+        block formats round up to whole 4x4 blocks.
+    """
+    if fmt == SUPPORTED_FORMAT:
+        return max(1, width) * max(1, height) * 4
+    from . import dxt
+    return dxt.block_size(width, height, fmt)
+
+
 def _walk_mips(uexp: bytes, cursor: int, count: int, width: int, height: int,
                fmt: str, first_level: int = 0):
     """Locate every mip level in a block-compressed texture.
@@ -120,8 +138,6 @@ def _walk_mips(uexp: bytes, cursor: int, count: int, width: int, height: int,
         TextureError: If a level cannot be located, which means the layout is
             not the one this understands.
     """
-    from . import dxt
-
     out = []
     bulk_at = 0
     w, h = width, height
@@ -129,7 +145,7 @@ def _walk_mips(uexp: bytes, cursor: int, count: int, width: int, height: int,
         level = first_level + n
         cursor += 4                                  # the level's own index
         want = struct.pack("<iii", w, h, 1)
-        size = dxt.block_size(w, h, fmt)
+        size = mip_size(w, h, fmt)
         if uexp[cursor:cursor + 12] == want:         # held in the bulk file
             out.append(MipLevel(level, w, h, size, "ubulk", bulk_at))
             bulk_at += size
@@ -175,20 +191,14 @@ def parse(uexp: bytes, ubulk: bytes = b"") -> Texture:
     (slen,) = struct.unpack_from("<i", uexp, len_at)
     after = len_at + 4 + slen
 
-    if fmt == SUPPORTED_FORMAT:
-        start = after + BULK_HEADER_GAP
-        need = w * h * 4
-        if start + need + TRAILER != len(uexp):
-            raise TextureError(
-                f"unexpected texture layout: {w}x{h} needs {need} bytes at offset "
-                f"{start}, but the payload is {len(uexp)} bytes "
-                "(mipmapped uncompressed textures are not supported)")
-        return Texture(w, h, fmt, start, uexp, [], b"")
-
-    # Large textures have their top levels cooked out, so the chain starts at
-    # FirstMipToSerialize rather than at the full size.
+    # Every format uses the same chain, uncompressed included: card art simply
+    # has one level. Large textures have their top levels cooked out, so the
+    # chain starts at FirstMipToSerialize rather than at the full size.
     (first_mip,) = struct.unpack_from("<i", uexp, after)
     (count,) = struct.unpack_from("<i", uexp, after + 4)
+    if not 0 <= first_mip < 32 or not 0 < count <= 32:
+        raise TextureError(
+            f"unexpected mip header: first={first_mip} count={count}")
     mw, mh = max(1, w >> first_mip), max(1, h >> first_mip)
     mips, end = _walk_mips(uexp, after + 8, count, mw, mh, fmt, first_mip)
     bulk_needed = sum(m.size for m in mips if m.where == "ubulk")
@@ -196,24 +206,6 @@ def parse(uexp: bytes, ubulk: bytes = b"") -> Texture:
         raise TextureError(
             f"bulk file is {len(ubulk)} bytes but the mip chain needs {bulk_needed}")
     return Texture(w, h, fmt, mips[0].offset if mips else after, uexp, mips, ubulk)
-
-
-def to_png_bytes(tex: Texture):
-    """Decode a texture's pixels into an image.
-
-    Args:
-        tex (Texture): A texture from :func:`parse`.
-
-    Returns:
-        PIL.Image.Image: An RGBA image, channel-swapped from the stored BGRA.
-        Despite the name this returns an image object, not encoded PNG bytes;
-        call ``.save(path)`` on it to write a file.
-    """
-    from PIL import Image
-    px = tex.raw[tex.data_offset:tex.data_offset + tex.byte_count]
-    img = Image.frombytes("RGBA", (tex.width, tex.height), px)
-    b, g, r, a = img.split()
-    return Image.merge("RGBA", (r, g, b, a))
 
 
 def replace(tex: Texture, image):
@@ -249,22 +241,10 @@ def replace(tex: Texture, image):
         top = (im.height - tex.height) // 2
         im = im.crop((left, top, left + tex.width, top + tex.height))
 
-    if not tex.is_block:
-        r, g, b, a = im.split()
-        bgra = Image.merge("RGBA", (b, g, r, a)).tobytes()
-        if len(bgra) != tex.byte_count:
-            raise TextureError(
-                f"converted image is {len(bgra)} bytes, expected {tex.byte_count}")
-        out = bytearray(tex.raw)
-        out[tex.data_offset:tex.data_offset + tex.byte_count] = bgra
-        return bytes(out), b""
-
-    from . import dxt
-
     uexp = bytearray(tex.raw)
     ubulk = bytearray(tex.ubulk)
     for m in tex.mips:
-        data = dxt.encode(im, m.width, m.height, tex.pixel_format)
+        data = _encode_mip(im, m.width, m.height, tex.pixel_format)
         if len(data) != m.size:
             raise TextureError(
                 f"mip {m.level} encoded to {len(data)} bytes, expected {m.size}")
@@ -275,8 +255,31 @@ def replace(tex: Texture, image):
     return bytes(uexp), bytes(ubulk)
 
 
+def _encode_mip(image, width: int, height: int, fmt: str) -> bytes:
+    """Encode one mip level.
+
+    Args:
+        image (PIL.Image.Image): Source art, already cropped to aspect.
+        width (int): Mip width.
+        height (int): Mip height.
+        fmt (str): Pixel format.
+
+    Returns:
+        bytes: Encoded data for that level.
+    """
+    from PIL import Image
+
+    if fmt == SUPPORTED_FORMAT:
+        im = image.convert("RGBA").resize((max(1, width), max(1, height)),
+                                          Image.LANCZOS)
+        r, g, b, a = im.split()
+        return Image.merge("RGBA", (b, g, r, a)).tobytes()
+    from . import dxt
+    return dxt.encode(image, width, height, fmt)
+
+
 def to_image(tex: Texture, ubulk: bytes = b""):
-    """Decode a texture's largest mip into an image.
+    """Decode a texture's largest stored mip into an image.
 
     Args:
         tex (Texture): A texture from :func:`parse`.
@@ -291,14 +294,20 @@ def to_image(tex: Texture, ubulk: bytes = b""):
     from PIL import Image
     import io
 
-    if not tex.is_block:
-        return to_png_bytes(tex)
     data = ubulk or tex.ubulk
     top = tex.mips[0]
-    if top.where == "ubulk":
-        payload = data[top.offset:top.offset + top.size]
-    else:
-        payload = tex.raw[top.offset:top.offset + top.size]
+    payload = (data[top.offset:top.offset + top.size] if top.where == "ubulk"
+               else tex.raw[top.offset:top.offset + top.size])
+    if len(payload) != top.size:
+        raise TextureError(
+            f"mip 0 is {len(payload)} bytes, expected {top.size}; "
+            "the bulk file may be missing")
+
+    if not tex.is_block:
+        img = Image.frombytes("RGBA", (top.width, top.height), payload)
+        b, g, r, a = img.split()
+        return Image.merge("RGBA", (r, g, b, a))
+
     # PIL reads DDS, so wrap the block data in a minimal header rather than
     # writing a decoder.
     four_cc = b"DXT1" if tex.pixel_format == "PF_DXT1" else b"DXT5"
@@ -309,3 +318,16 @@ def to_image(tex: Texture, ubulk: bytes = b""):
            + (32).to_bytes(4, "little") + (4).to_bytes(4, "little") + four_cc
            + b"\0" * 20 + (0x1000).to_bytes(4, "little") + b"\0" * 16)
     return Image.open(io.BytesIO(hdr + payload)).convert("RGBA")
+
+
+def to_png_bytes(tex: Texture):
+    """Decode a texture into an image.
+
+    Args:
+        tex (Texture): A texture from :func:`parse`.
+
+    Returns:
+        PIL.Image.Image: An RGBA image. Kept as an alias of :func:`to_image`
+        for callers written before block formats were supported.
+    """
+    return to_image(tex)

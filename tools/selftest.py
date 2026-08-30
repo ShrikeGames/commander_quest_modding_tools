@@ -98,6 +98,24 @@ def main():
     img = texture.to_png_bytes(tex)
     check("texture decode/encode round-trips", texture.replace(tex, img)[0] == tex.raw)
 
+    cards_art = [p[:-5] for p in r.files()
+                 if p.endswith(".uexp")
+                 and p.startswith("Commander/Content/UI/ArtResources/")]
+    art_ok = art_bad = 0
+    mipped = 0
+    for base in cards_art:
+        ue2 = r.read(base + ".uexp")
+        ub2 = r.read(base + ".ubulk") if base + ".ubulk" in r else b""
+        try:
+            t2 = texture.parse(ue2, ub2)
+            art_ok += 1
+            if len(t2.mips) > 1:
+                mipped += 1
+        except Exception:
+            art_bad += 1
+    check("every card illustration parses", art_bad == 0,
+          f"{art_ok} parsed, {mipped} of them mipmapped")
+
     unit_tex = "Commander/Content/ArtAssets/Model/Human/Human_Texture/T_Human_Assasin_D"
     if unit_tex + ".uexp" in r:
         ue = r.read(unit_tex + ".uexp")
@@ -116,6 +134,18 @@ def main():
         a1 = _np.asarray(texture.to_image(bt).convert("RGB"), dtype=_np.int16)
         a2 = _np.asarray(texture.to_image(texture.parse(new_ue, new_ub)).convert("RGB"),
                          dtype=_np.int16)
+        sheep = ("Commander/Content/UI/ArtResources/Card/Neutral/"
+                 "T_Image_Card_Summon_Sheep_B")
+        if sheep + ".uexp" in r:
+            sue = r.read(sheep + ".uexp")
+            sub = r.read(sheep + ".ubulk") if sheep + ".ubulk" in r else b""
+            st = texture.parse(sue, sub)
+            check("mipmapped uncompressed card art parses", len(st.mips) > 1,
+                  f"{st.pixel_format} {st.width}x{st.height}, {len(st.mips)} mips")
+            s_ue, s_ub = texture.replace(st, texture.to_image(st))
+            check("mipmapped uncompressed art round-trips",
+                  len(s_ue) == len(sue) and len(s_ub) == len(sub))
+
         check("the block encoder round-trips within tolerance",
               _np.abs(a1 - a2).mean() < 4.0,
               f"mean error {_np.abs(a1 - a2).mean():.2f}/255")
