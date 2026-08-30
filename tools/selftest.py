@@ -22,6 +22,14 @@ passed = failed = 0
 
 
 def check(name, cond, detail=""):
+    """Record one check result and print it.
+
+    Args:
+        name (str): What was checked, phrased as the property that should hold.
+        cond (bool): Whether it holds.
+        detail (str): Optional measured value, shown either way so passing
+            checks still report what they saw.
+    """
     global passed, failed
     if cond:
         passed += 1
@@ -32,6 +40,11 @@ def check(name, cond, detail=""):
 
 
 def main():
+    """Run every check against the real game pak.
+
+    Returns:
+        int: 0 if all checks passed, 1 otherwise, for use as an exit status.
+    """
     print("opening pak...")
     t = time.time()
     r = PakReader(config.pak_path(), config.aes_key())

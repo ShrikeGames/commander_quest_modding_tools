@@ -24,9 +24,19 @@ ACCENT = "#B03A0B"
 
 
 class LoadThread(QThread):
+    """Opens the pak and builds the catalog off the UI thread.
+
+    Emits :attr:`done` with ``(reader, assets, error)``; on failure the first
+    two are None and the third carries a traceback for display.
+    """
     done = Signal(object, object, str)
 
     def run(self):
+        """Open the archive and index it, emitting the result.
+
+        Exceptions are captured and forwarded rather than raised, since an
+        exception escaping a Qt thread would terminate the process.
+        """
         try:
             reader = PakReader(config.pak_path(), config.aes_key())
             assets = catalog.build(reader)
@@ -36,7 +46,15 @@ class LoadThread(QThread):
 
 
 class MainWindow(QMainWindow):
+    """The main editor window.
+
+    Left to right: a class filter, the asset list, and a detail pane with tabs
+    for text, art, raw values and staged edits. Edits accumulate in a
+    :class:`cqmod.project.Project` until *Build & Install* compiles them.
+    """
     def __init__(self):
+        """Build the window and start loading the archive in the background.
+        """
         super().__init__()
         self.setWindowTitle("Commander Quest Mod Tool")
         self.resize(1450, 900)
@@ -53,6 +71,8 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- UI
     def _build_ui(self):
+        """Construct the toolbar, filter list, asset table and detail pane.
+        """
         tb = QToolBar("Main")
         tb.setMovable(False)
         self.addToolBar(tb)
@@ -101,11 +121,25 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _boxed(title, w):
+        """Wrap a widget in a titled group box.
+
+        Args:
+            title (str): Caption for the box.
+            w (QWidget): Widget to wrap.
+
+        Returns:
+            QGroupBox: The wrapped widget.
+        """
         g = QGroupBox(title); lay = QVBoxLayout(g)
         lay.setContentsMargins(6, 6, 6, 6); lay.addWidget(w)
         return g
 
     def _detail_panel(self):
+        """Build the tabbed detail pane.
+
+        Returns:
+            QTabWidget: Tabs for text, art, raw values and staged edits.
+        """
         self.tabs = QTabWidget()
 
         # --- Overview / text ---
@@ -186,6 +220,8 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------- load
     def _start_load(self):
+        """Kick off background loading of the pak and catalog.
+        """
         self.build_btn.setEnabled(False)
         self.statusBar().showMessage("Opening pak and indexing assets...")
         self._loader = LoadThread()
@@ -193,6 +229,13 @@ class MainWindow(QMainWindow):
         self._loader.start()
 
     def _loaded(self, reader, assets, err):
+        """Populate the window once loading finishes.
+
+        Args:
+            reader (cqmod.pak.PakReader | None): The open archive, or None on failure.
+            assets (list | None): The catalog, or None on failure.
+            err (str): Error text; empty on success.
+        """
         if err:
             QMessageBox.critical(self, "Could not open the game pak", err)
             self.statusBar().showMessage("Load failed")
@@ -211,6 +254,8 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------- filter
     def _refilter(self):
+        """Re-apply the search box and class filter to the asset table.
+        """
         if not self.assets:
             return
         q = self.search.text().strip().lower()
@@ -236,6 +281,8 @@ class MainWindow(QMainWindow):
 
     # ----------------------------------------------------------- detail
     def _select_asset(self):
+        """Show the selected asset across every detail tab.
+        """
         rows = self.table.selectionModel().selectedRows()
         if not rows:
             return
@@ -260,6 +307,11 @@ class MainWindow(QMainWindow):
         self._load_art(a)
 
     def _load_art(self, a):
+        """Show an asset's art, or why it cannot be shown.
+
+        Args:
+            a (cqmod.catalog.Asset): The selected asset.
+        """
         self.art.clear(); self.art_info.setText("")
         self.replace_art_btn.setEnabled(False); self.export_art_btn.setEnabled(False)
         if not a.texture or (a.texture + ".uexp") not in self.reader:
@@ -282,6 +334,16 @@ class MainWindow(QMainWindow):
             self.art.setText(f"cannot display art:\n{e}")
 
     def _load_values(self, a):
+        """List the integer slots in an asset's export payloads.
+
+        Offsets advance one byte at a time rather than four: real property
+        layouts interleave smaller types, so a four-byte stride silently skips
+        fields. Candidates from the field finder are highlighted, and staged
+        edits are shown in the accent colour.
+
+        Args:
+            a (cqmod.catalog.Asset): The selected asset.
+        """
         self.values.blockSignals(True)
         self.values.setRowCount(0)
         try:
@@ -320,12 +382,27 @@ class MainWindow(QMainWindow):
         self.values.blockSignals(False)
 
     def _variant_of(self, a):
+        """Find an asset's upgraded counterpart.
+
+        Args:
+            a (cqmod.catalog.Asset): The asset to look up.
+
+        Returns:
+            cqmod.catalog.Asset | None: Its ``+`` variant, or None if it has
+            none or is already one.
+        """
         want = diff.variant_name(a.name)
         if want == a.name:
             return None
         return next((x for x in self.assets if x.name == want), None)
 
     def _find_fields(self):
+        """Diff the current asset against its variant to locate gameplay values.
+
+        Populates the candidate highlight and filters the value list to it. If
+        nothing differs, the status bar explains that the upgrade probably
+        changes text or adds an effect rather than a number.
+        """
         a = self.current
         b = self._variant_of(a)
         if not b:
@@ -350,6 +427,8 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------ edits
     def _stage_text(self):
+        """Stage title and description changes that differ from the original.
+        """
         a = self.current
         if not a:
             return
@@ -362,6 +441,8 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(f"staged {n} text change(s)" if n else "no text changes", 4000)
 
     def _replace_art(self):
+        """Pick a replacement image and stage it for the current asset.
+        """
         a = self.current
         if not a:
             return
@@ -372,6 +453,8 @@ class MainWindow(QMainWindow):
             self._refresh_edits(); self._load_art(a)
 
     def _export_art(self):
+        """Save the current asset's art to a PNG file.
+        """
         if not getattr(self, "_art_image", None):
             return
         p, _ = QFileDialog.getSaveFileName(self, "Export art",
@@ -381,6 +464,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"wrote {p}", 5000)
 
     def _value_changed(self, item):
+        """Stage or clear a value edit when a cell is edited.
+
+        Clearing the cell removes the edit. Non-numeric input is rejected with
+        a warning rather than silently ignored.
+
+        Args:
+            item (QTableWidgetItem): The edited cell.
+        """
         if item.column() != 4 or not self.current:
             return
         off = item.data(Qt.UserRole)
@@ -400,6 +491,8 @@ class MainWindow(QMainWindow):
         self._refresh_edits()
 
     def _refresh_edits(self):
+        """Redraw the staged-edit list and update the tab's count badge.
+        """
         p = self.project
         lines = []
         for t in p.texts:
@@ -413,6 +506,8 @@ class MainWindow(QMainWindow):
         self.tabs.setTabText(3, f"Pending edits ({n})" if n else "Pending edits")
 
     def _clear_edits(self):
+        """Discard every staged edit, keeping the project name.
+        """
         self.project = Project(name=self.project.name)
         self._refresh_edits()
         if self.current:
@@ -420,6 +515,8 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------- project
     def open_project(self):
+        """Load a project file, replacing the staged edits.
+        """
         p, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON (*.json)")
         if p:
             self.project = Project.load(p); self.project_path = Path(p)
@@ -428,6 +525,8 @@ class MainWindow(QMainWindow):
                 self._select_asset()
 
     def save_project(self):
+        """Write the staged edits to a project file.
+        """
         p, _ = QFileDialog.getSaveFileName(self, "Save project",
                                            str(self.project_path or "mod_project.json"),
                                            "JSON (*.json)")
@@ -436,6 +535,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(f"saved {p}", 5000)
 
     def build_and_install(self):
+        """Compile the staged edits and install the mod pak.
+
+        On success reports what was written and how to uninstall; on failure
+        shows the error together with the partial build log.
+        """
         if self.project.is_empty:
             QMessageBox.information(self, "Nothing to build",
                                     "Stage some edits first.")
@@ -454,6 +558,14 @@ class MainWindow(QMainWindow):
 
 
 def main():
+    """Start the application.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: Always, carrying the Qt event loop's exit code.
+    """
     app = QApplication(sys.argv)
     app.setApplicationName("Commander Quest Mod Tool")
     w = MainWindow(); w.show()

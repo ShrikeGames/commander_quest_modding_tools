@@ -1,30 +1,61 @@
-"""FText values inside cooked export data.
+"""``FText`` values inside cooked export data.
 
-Card titles and descriptions are string-table references, which serialize as:
-    uint32 Flags | int8 HistoryType(=11) | FName TableId | FString Key
-The FName is an index into the owning package's name table.
+Card titles and descriptions are string-table references rather than inline
+strings. They serialize as::
+
+    uint32  Flags
+    int8    HistoryType   (11 = StringTableEntry)
+    FName   TableId       index into the owning package's name table
+    FString Key           e.g. 'Insight_Title'
+
+The key is looked up in the string table at runtime, and localized through
+``Game.locres`` -- so editing card text means editing the locres, not the asset.
+See :mod:`cqmod.locres`.
 """
 from __future__ import annotations
 import struct
 from dataclasses import dataclass
 
 HISTORY_STRING_TABLE = 11
+"""``ETextHistoryType::StringTableEntry``."""
 
 
 @dataclass
 class StringTableText:
-    offset: int          # where the FText starts in the export data
+    """A string-table ``FText`` located inside an export payload.
+
+    Attributes:
+        offset (int): Where the ``FText`` starts in the ``.uexp``.
+        end (int): One past its last byte, so ``[offset:end]`` is the whole value.
+        table_name (str): Package path of the string table, e.g.
+            ``/Game/Data/Cards/SupplyCards/ST_Card_Supply.ST_Card_Supply``. The
+            part after the final dot is the locres namespace.
+        key (str): Lookup key within that table, e.g. ``Insight_Title``.
+    """
+
+    offset: int
     end: int
-    table_name: str      # e.g. '/Game/.../ST_Card_Supply.ST_Card_Supply'
-    key: str             # e.g. 'Insight_Title'
+    table_name: str
+    key: str
 
 
 def find_all(data: bytes, names: list) -> list:
-    """Scan an export payload for string-table FTexts.
+    """Scan an export payload for string-table ``FText`` values.
 
-    Scanning rather than walking properties by index: it needs no schema and is
-    stable across the different card classes, which order their properties
-    differently.
+    This scans for the byte signature rather than walking properties by index,
+    deliberately: property order differs between card classes and would need a
+    ``.usmap`` to follow, whereas the signature is unambiguous enough to match
+    directly. A candidate is only accepted if its name index is in range and its
+    key is printable, which rejects coincidental byte patterns.
+
+    Args:
+        data (bytes): An export payload, or a whole ``.uexp``.
+        names (list[str]): The owning package's name table, used to resolve the
+            ``FName`` table reference.
+
+    Returns:
+        list[StringTableText]: Matches in ascending offset order. For cards this
+        is typically the title followed by the description.
     """
     out = []
     o = 0

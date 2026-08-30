@@ -1,15 +1,22 @@
 """Unversioned property headers.
 
-Cooked packages here use PKG_UnversionedProperties: instead of a self-describing
-name/type stream, each export's data starts with a run-length bitmap saying
-*which* property indices (in the class's declared order) are present. Values
-then follow in index order.
+Cooked packages here set ``PKG_UnversionedProperties``. Instead of a
+self-describing name/type stream, each export's payload starts with a run-length
+bitmap saying *which* property indices -- positions in the class's declared
+property order -- carry a value. The values themselves then follow in index
+order, with no type tags.
 
-Without a .usmap we know which indices are set and where their bytes are, but
-not the property names or types. That is still enough to locate and edit values
-by index, which is how the tools work today.
+Without a ``.usmap`` we can therefore see which indices are set and where the
+value bytes begin, but not property names or types. That is still enough to
+locate and edit values by byte offset, which is how these tools work. See
+``docs/formats/unversioned.md``.
 
-Fragment layout (uint16): SkipNum:7 | bHasZeroes:1 | bIsLast:1 | ValueNum:7
+Fragment layout, one ``uint16`` each::
+
+    bits 0-6    SkipNum      properties skipped before this run
+    bit  7      bHasZeroes   run has a trailing zero bitmap
+    bit  8      bIsLast      final fragment
+    bits 9-15   ValueNum     properties carrying a value in this run
 """
 from __future__ import annotations
 import struct
@@ -18,6 +25,16 @@ from dataclasses import dataclass
 
 @dataclass
 class Fragment:
+    """One run in an unversioned property header.
+
+    Attributes:
+        skip (int): Property indices skipped before this run begins.
+        has_zeroes (bool): Whether any value in the run is zero-valued and
+            recorded in the header's trailing zero bitmap rather than inline.
+        is_last (bool): Whether this is the final fragment of the header.
+        value_count (int): Consecutive properties carrying a value in this run.
+    """
+
     skip: int
     has_zeroes: bool
     is_last: bool
@@ -25,24 +42,63 @@ class Fragment:
 
     @classmethod
     def unpack(cls, v: int) -> "Fragment":
+        """Decode a fragment from its packed representation.
+
+        Args:
+            v (int): The raw ``uint16`` read from the header.
+
+        Returns:
+            Fragment: The decoded fragment.
+        """
         return cls(v & 0x7F, bool(v & 0x80), bool(v & 0x100), v >> 9)
 
     def pack(self) -> int:
+        """Encode this fragment back to its packed representation.
+
+        Returns:
+            int: A ``uint16`` suitable for writing into a header.
+        """
         return ((self.value_count & 0x7F) << 9) | (0x100 if self.is_last else 0) \
                | (0x80 if self.has_zeroes else 0) | (self.skip & 0x7F)
 
 
 @dataclass
 class Header:
+    """A parsed unversioned property header.
+
+    Attributes:
+        fragments (list[Fragment]): Runs in the order they were read.
+        indices (list[int]): Property indices carrying a value, ascending. These
+            are positions in the class's declared property order, not names.
+        size (int): Bytes the header occupies, including any zero bitmap. Value
+            data begins this many bytes after the header's start.
+        zero_mask_bits (int): Number of bits in the trailing zero bitmap.
+    """
+
     fragments: list
-    indices: list        # property indices carrying a value, in order
-    size: int            # bytes consumed by the header (+ zero bitmap)
+    indices: list
+    size: int
     zero_mask_bits: int
 
 
 def parse(data: bytes, off: int = 0) -> Header:
+    """Parse the unversioned property header at the start of an export payload.
+
+    Args:
+        data (bytes): The full ``.uexp`` payload.
+        off (int): Byte offset where the export's data begins. Use
+            :meth:`cqmod.uasset.Export.uexp_slice` to compute it.
+
+    Returns:
+        Header: The decoded header, whose :attr:`Header.size` tells you where
+        the export's value bytes start.
+
+    Raises:
+        struct.error: If the data ends before a terminating fragment is found,
+            which normally means ``off`` did not point at an export boundary.
+    """
     frags, indices = [], []
-    idx = o = 0
+    idx = 0
     o = off
     while True:
         (v,) = struct.unpack_from("<H", data, o); o += 2

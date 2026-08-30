@@ -1,21 +1,27 @@
-"""A mod project: a set of edits that compile into a single _P.pak.
+"""A mod project: a set of staged edits that compile into a single ``_P.pak``.
 
-Three edit kinds are supported today, all chosen because they preserve byte
-lengths and therefore need no .uasset export-table surgery:
+Three edit kinds are supported, all chosen because they preserve byte lengths
+and therefore need no ``.uasset`` export-table surgery:
 
-  TextEdit      retarget an existing localization string
-  TextureEdit   replace card art (PF_B8G8R8A8, dimensions preserved)
-  ValueEdit     overwrite an int32 inside an export payload
+======================  =====================================================
+:class:`TextEdit`       retarget an existing localization string
+:class:`TextureEdit`    replace card art, dimensions preserved
+:class:`ValueEdit`      overwrite an ``int32`` inside an export payload
+======================  =====================================================
 
-Creating genuinely *new* assets is not possible this way -- that changes byte
-lengths and needs the class property schema. See README.
+Creating genuinely *new* assets is out of scope: that changes byte lengths and
+needs the class property schema a ``.usmap`` would provide. See
+``docs/limitations.md``.
+
+Projects serialize to JSON, so a mod is a small readable file that can be kept
+under version control and rebuilt after a game patch.
 """
 from __future__ import annotations
 import json, struct
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from . import locres, texture, uasset
+from . import locres, texture
 from .pak import build_pak
 
 LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
@@ -23,6 +29,16 @@ LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
 
 @dataclass
 class TextEdit:
+    """A change to one localized string.
+
+    Attributes:
+        namespace (str): Locres namespace, e.g. ``ST_Card_Supply``.
+        key (str): Key within it, e.g. ``Insight_Title``.
+        value (str): Replacement text.
+        locale (str): Locale to edit. Only this locale changes, so other
+            languages keep the original text.
+    """
+
     namespace: str
     key: str
     value: str
@@ -31,27 +47,58 @@ class TextEdit:
 
 @dataclass
 class TextureEdit:
-    texture_path: str        # pak path without extension
-    image_path: str          # local PNG
+    """A replacement for one texture's art.
+
+    Attributes:
+        texture_path (str): Pak path of the art package, without extension.
+        image_path (str): Local image file. Read at build time, so editing the
+            file and rebuilding picks up the new version.
+    """
+
+    texture_path: str
+    image_path: str
 
 
 @dataclass
 class ValueEdit:
-    asset_path: str          # pak path without extension
-    offset: int              # byte offset into the .uexp
+    """An overwrite of one ``int32`` inside an asset payload.
+
+    Attributes:
+        asset_path (str): Pak path of the asset, without extension.
+        offset (int): Byte offset into its ``.uexp``. Find these with
+            :func:`cqmod.diff.compare` rather than by hand.
+        value (int): Replacement value.
+        label (str): Optional note recorded for the build log.
+    """
+
+    asset_path: str
+    offset: int
     value: int
     label: str = ""
 
 
 @dataclass
 class Project:
+    """A named collection of staged edits.
+
+    Attributes:
+        name (str): Mod name, used for the output filename.
+        texts (list[TextEdit]): Staged text changes.
+        textures (list[TextureEdit]): Staged art replacements.
+        values (list[ValueEdit]): Staged value overwrites.
+    """
+
     name: str = "MyMod"
     texts: list = field(default_factory=list)
     textures: list = field(default_factory=list)
     values: list = field(default_factory=list)
 
-    # -- persistence -----------------------------------------------------
     def save(self, path) -> None:
+        """Write the project to JSON.
+
+        Args:
+            path (str | Path): Destination file.
+        """
         Path(path).write_text(json.dumps({
             "name": self.name,
             "texts": [asdict(t) for t in self.texts],
@@ -61,6 +108,14 @@ class Project:
 
     @classmethod
     def load(cls, path) -> "Project":
+        """Read a project from JSON.
+
+        Args:
+            path (str | Path): File written by :meth:`save`.
+
+        Returns:
+            Project: The restored project.
+        """
         d = json.loads(Path(path).read_text())
         return cls(
             name=d.get("name", "MyMod"),
@@ -71,10 +126,22 @@ class Project:
 
     @property
     def is_empty(self) -> bool:
+        """Whether anything is staged.
+
+        Returns:
+            bool: True if there is nothing to build.
+        """
         return not (self.texts or self.textures or self.values)
 
-    # -- editing ---------------------------------------------------------
     def set_text(self, namespace, key, value, locale="en"):
+        """Stage a text change, replacing any existing edit to the same key.
+
+        Args:
+            namespace (str): Locres namespace.
+            key (str): Key within it.
+            value (str): Replacement text.
+            locale (str): Locale to edit.
+        """
         for t in self.texts:
             if (t.namespace, t.key, t.locale) == (namespace, key, locale):
                 t.value = value
@@ -82,6 +149,12 @@ class Project:
         self.texts.append(TextEdit(namespace, key, value, locale))
 
     def set_texture(self, texture_path, image_path):
+        """Stage an art replacement, replacing any existing edit to the same texture.
+
+        Args:
+            texture_path (str): Pak path of the art package, without extension.
+            image_path (str): Local image file.
+        """
         for t in self.textures:
             if t.texture_path == texture_path:
                 t.image_path = image_path
@@ -89,6 +162,14 @@ class Project:
         self.textures.append(TextureEdit(texture_path, image_path))
 
     def set_value(self, asset_path, offset, value, label=""):
+        """Stage a value overwrite, replacing any existing edit at the same offset.
+
+        Args:
+            asset_path (str): Pak path of the asset, without extension.
+            offset (int): Byte offset into its ``.uexp``.
+            value (int): Replacement value.
+            label (str): Optional note for the build log.
+        """
         for v in self.values:
             if (v.asset_path, v.offset) == (asset_path, offset):
                 v.value, v.label = value, label
@@ -96,16 +177,45 @@ class Project:
         self.values.append(ValueEdit(asset_path, offset, value, label))
 
     def clear_asset(self, asset_path):
+        """Drop every staged value edit for one asset.
+
+        Args:
+            asset_path (str): Pak path of the asset, without extension.
+        """
         self.values = [v for v in self.values if v.asset_path != asset_path]
 
-    # -- building --------------------------------------------------------
     def build(self, reader, log=None) -> bytes:
+        """Apply every staged edit and compile a mod pak.
+
+        Edits are grouped before being applied, so several changes to one asset
+        share a single read, and all text edits for a locale are folded into one
+        rewrite of that localization resource. Both the edited ``.uexp`` and its
+        untouched ``.uasset`` are included, keeping the pair together.
+
+        Args:
+            reader (cqmod.pak.PakReader): An open archive to read originals from.
+            log (Callable[[str], None] | None): Called with progress lines.
+
+        Returns:
+            bytes: A complete ``.pak``.
+
+        Raises:
+            ValueError: If nothing is staged, or a value edit's offset lies
+                outside the asset's payload.
+            cqmod.texture.TextureError: If a replacement image cannot be fitted.
+            KeyError: If a referenced asset is not in the archive.
+        """
         def say(m):
-            if log: log(m)
+            """Emit one progress line if a logger was supplied.
+
+            Args:
+                m (str): The message.
+            """
+            if log:
+                log(m)
 
         files: dict[str, bytes] = {}
 
-        # value edits, grouped so several edits to one asset apply together
         by_asset: dict[str, list] = {}
         for v in self.values:
             by_asset.setdefault(v.asset_path, []).append(v)
@@ -121,7 +231,6 @@ class Project:
             files[asset + ".uexp"] = bytes(payload)
             files[asset + ".uasset"] = reader.read(asset + ".uasset")
 
-        # texture edits
         from PIL import Image
         for t in self.textures:
             tex = texture.parse(reader.read(t.texture_path + ".uexp"))
@@ -131,7 +240,6 @@ class Project:
             say(f"  art    {Path(t.texture_path).name} <- {Path(t.image_path).name} "
                 f"({tex.width}x{tex.height})")
 
-        # text edits, batched per locale into one locres rewrite each
         by_locale: dict[str, list] = {}
         for t in self.texts:
             by_locale.setdefault(t.locale, []).append(t)
@@ -149,10 +257,24 @@ class Project:
         return build_pak(sorted(files.items()))
 
     def install(self, reader, paks_dir, log=None) -> Path:
-        """Write the mod pak into the game's Paks folder.
+        """Build the mod and write it into the game's pak folder.
 
-        The ZZZ_ prefix keeps it sorting last, and _P marks it as a patch pak so
-        UE mounts it at higher priority than the base archive.
+        The output is named ``ZZZ_<name>_P.pak``: ``_P`` marks it as a patch pak
+        so UE mounts it above the base archive, and the ``ZZZ`` prefix keeps it
+        sorting last among patches.
+
+        Args:
+            reader (cqmod.pak.PakReader): An open archive to read originals from.
+            paks_dir (str | Path): The game's ``Content/Paks`` directory.
+            log (Callable[[str], None] | None): Called with progress lines.
+
+        Returns:
+            Path: The installed file. Delete it to uninstall the mod; nothing
+            else on disk is modified.
+
+        Raises:
+            ValueError: Propagated from :meth:`build`.
+            OSError: If the pak folder is not writable.
         """
         raw = self.build(reader, log=log)
         out = Path(paks_dir) / f"ZZZ_{self.name}_P.pak"

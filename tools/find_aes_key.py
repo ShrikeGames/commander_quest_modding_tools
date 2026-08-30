@@ -21,6 +21,13 @@ FINDER_DIR = Path(__file__).resolve().parent / "aes_finder"
 
 
 def find_pid():
+    """Locate the running game process.
+
+    Returns:
+        int | None: The PID of the shipping binary, or None if it is not
+        running. Matches on the full command line, since under Proton the
+        process name alone is not distinctive.
+    """
     try:
         out = subprocess.run(["pgrep", "-f", PROC_NAME],
                              capture_output=True, text=True).stdout
@@ -37,6 +44,16 @@ def find_pid():
 
 
 def pak_index_info(pak: Path):
+    """Read the index location and hash from a pak footer.
+
+    Args:
+        pak (Path): The archive to inspect.
+
+    Returns:
+        tuple[int, int, str]: Index offset, index size, and the index SHA-1 as
+        hex. The hash is what lets a candidate key be *proven* rather than
+        guessed.
+    """
     with open(pak, "rb") as f:
         f.seek(0, 2); size = f.tell()
         f.seek(size - 221); foot = f.read(221)
@@ -48,6 +65,19 @@ def pak_index_info(pak: Path):
 
 
 def main():
+    """Recover the key and optionally store it.
+
+    Builds the native scanner on demand, runs it against the game process, and
+    prints the recovered key.
+
+    Returns:
+        None
+
+    Raises:
+        SystemExit: If the game is not running, the scanner cannot be built,
+            process memory is unreadable, or no key is found. Each case exits
+            with a message naming the fix.
+    """
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pid", type=int, help="game PID (default: auto-detect)")

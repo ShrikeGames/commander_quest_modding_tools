@@ -67,6 +67,20 @@ it diffs a card against its upgraded variant, filters out text and misaligned re
 and usually leaves one or two offsets — the gameplay numbers. Across all 281 variant
 pairs in the game the median result is 0 candidates and the maximum is 6.
 
+## Documentation
+
+Full docs are in [`docs/`](docs/index.md):
+
+| | |
+|---|---|
+| [Getting started](docs/getting-started.md) | Install, configure, recover the key, build a first mod |
+| [GUI guide](docs/gui-guide.md) | The editor, tab by tab |
+| [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
+| [Architecture](docs/architecture.md) | Module map and data flow |
+| [Limitations](docs/limitations.md) | What these tools cannot do, and why |
+| [Reverse engineering notes](docs/reverse-engineering.md) | How the format was worked out |
+| Formats | [pak](docs/formats/pak.md) · [package](docs/formats/package.md) · [unversioned properties](docs/formats/unversioned.md) · [locres](docs/formats/locres.md) · [textures](docs/formats/texture.md) |
+
 ## How it works
 
 ```
@@ -97,6 +111,8 @@ Three facts make this tractable:
    needs no BC7/DXT encoder.
 
 ## Limitations
+
+See [docs/limitations.md](docs/limitations.md) for the full picture.
 
 **Adding genuinely new assets is not supported.** A new card needs a new `DT_Cards`
 row and a new asset, which changes byte lengths and therefore requires rewriting
