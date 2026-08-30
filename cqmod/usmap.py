@@ -44,6 +44,19 @@ SERIALIZED_SIZE = {
 }
 """Bytes each property type occupies in a cooked payload."""
 
+STRUCT_SIZE = {
+    "GameplayTag": 8,
+    "Color": 4,
+    "LinearColor": 16,
+    "Vector2D": 16,
+    "IntPoint": 8,
+    "DataTableRowHandle": 12,
+}
+"""Structs with a fixed serialized size. Others are measured or solved."""
+
+TAG_CONTAINER = "GameplayTagContainer"
+"""A count followed by that many FNames, each an index into the package's names."""
+
 VARIABLE_TYPES = {
     "TextProperty", "StrProperty", "ArrayProperty",
     "StructProperty", "MapProperty", "SetProperty",
@@ -150,6 +163,45 @@ class Usmap:
         """
         e = self.data.get(class_name)
         return e["properties"] if e else []
+
+    def tags(self, field, payload: bytes) -> list:
+        """Read the gameplay tags held by a tag container property.
+
+        A container is a count followed by that many ``FName`` values, each an
+        index into the owning package's name table plus an instance number. The
+        index is what a tag edit changes.
+
+        Args:
+            field (Field): A placed property whose struct is a tag container.
+            payload (bytes): The whole ``.uexp``.
+
+        Returns:
+            list[tuple[int, int]]: ``(offset, name index)`` per tag, in order.
+            Empty if the field is not a tag container.
+        """
+        if field.offset < 0 or field.size < 4:
+            return []
+        n = struct.unpack_from("<i", payload, field.offset)[0]
+        if not 0 <= n <= 4096 or 4 + 8 * n != field.size:
+            return []
+        return [(field.offset + 4 + 8 * i,
+                 struct.unpack_from("<I", payload, field.offset + 4 + 8 * i)[0])
+                for i in range(n)]
+
+    def is_tag_container(self, export, index: int) -> bool:
+        """Whether a property holds gameplay tags.
+
+        Args:
+            export (cqmod.catalog.ExportInfo): The owning export.
+            index (int): Property index.
+
+        Returns:
+            bool: True if the property is a ``GameplayTagContainer``.
+        """
+        for p in self.properties(export.class_name):
+            if p["index"] == index:
+                return p.get("struct") == TAG_CONTAINER
+        return False
 
     def solve_sizes(self, reader, assets) -> int:
         """Measure the serialized size of variable-typed properties.
@@ -260,15 +312,27 @@ class Usmap:
             """
             if cursor in text_at:
                 return [text_at[cursor] - cursor]
-            t = props[idx]["type"]
+            p = props[idx]
+            t = p["type"]
             if t in SERIALIZED_SIZE:
                 return [SERIALIZED_SIZE[t]]
-            fixed = self.sizes.get((export.class_name, idx))
-            if fixed is not None:
-                return [fixed]
+            if t == "StructProperty" and p.get("struct") in STRUCT_SIZE:
+                return [STRUCT_SIZE[p["struct"]]]
             if cursor + 4 > len(payload):
                 return []
             n = struct.unpack_from("<i", payload, cursor)[0]
+            # Containers serialize as a count followed by their elements, so the
+            # element width gives the size outright once the type is known.
+            if 0 <= n <= 4096:
+                if t == "StructProperty" and p.get("struct") == TAG_CONTAINER:
+                    return [4 + 8 * n]
+                if t in ("ArrayProperty", "SetProperty"):
+                    w = SERIALIZED_SIZE.get(p.get("inner", ""))
+                    if w:
+                        return [4 + w * n]
+            fixed = self.sizes.get((export.class_name, idx))
+            if fixed is not None:
+                return [fixed]
             if not 0 <= n <= 4096:
                 return []
             return [4 + n * w for w in (8, 4, 16, 1, 12, 32)]

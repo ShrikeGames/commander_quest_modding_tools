@@ -128,6 +128,31 @@ All 325 unit assets now place completely, and the recovered stats match the
 collection screen for every card checked: Militia 2/4, Ambush Cavalry 3/8,
 Assassin 6/2, Cataphract 4/13, Budding Squire 3/7.
 
+Capturing struct and array element types made the guessing unnecessary in most
+cases: a `GameplayTagContainer` is `4 + 8n`, an array is `4 + n` times its
+element width. Across the whole game 82% of exports now place completely.
+
+## Gameplay tags
+
+`StructProperty` now records which struct it holds, so a `GameplayTagContainer`
+is parsed rather than guessed: a count followed by that many `FName` values.
+Those resolve to real names, and the editor lists them as their own rows.
+
+```
+DA_Unit_Human_Archer   Tags -> Minion.AttackType.Projectile, Card.SummonType.Militia
+DA_Unit_Human_Cataphract  Tags -> Minion.Type.Cavalry
+```
+
+A tag is an `FName`, which is an index into the owning package's name table, so
+changing one is a four-byte write and the editor offers a dropdown of the names
+that package carries.
+
+**You can only pick a name the asset already references.** Archer's package has
+29 names of which two are tags, so those are the only choices. Introducing a tag
+the asset has never used would mean appending to the package name table, which
+shifts every offset in the header and each export's `SerialOffset`. That is not
+implemented.
+
 ## What is still not named
 
 Placement stops at the first variable-length property it cannot measure, so on a

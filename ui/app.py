@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QLineEdit,
     QLabel, QPushButton, QTabWidget, QTextEdit, QPlainTextEdit, QFileDialog,
     QMessageBox, QHeaderView, QAbstractItemView, QComboBox, QGroupBox,
-    QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy,
+    QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy, QComboBox,
 )
 
 from datetime import datetime
@@ -549,12 +549,25 @@ class MainWindow(QMainWindow):
         except Exception:
             self._payload = b""
 
+        try:
+            self._names = uasset.parse(self.reader.read(a.uasset)).names
+        except Exception:
+            self._names = []
+
         named = bool(self.usmap) and not self.raw_mode.isChecked()
         rows = []
         if named:
             for e in a.exports:
                 for f in self.usmap.place(e, self._payload):
-                    rows.append((e.index, f.name, f.type, f.offset, f.value, f.editable))
+                    rows.append((e.index, f.name, f.type, f.offset, f.value,
+                                 f.editable, None))
+                    if self.usmap.is_tag_container(e, f.index):
+                        for n, (off, nidx) in enumerate(
+                                self.usmap.tags(f, self._payload)):
+                            label = (self._names[nidx] if nidx < len(self._names)
+                                     else f"<name {nidx}>")
+                            rows.append((e.index, f"    tag[{n}]", "GameplayTag",
+                                         off, label, False, nidx))
             if not rows:
                 named = False
         if not named:
@@ -563,7 +576,7 @@ class MainWindow(QMainWindow):
                 end = min(e.end, len(self._payload))
                 for off in range(start, max(start, end - 3)):
                     (v,) = struct.unpack_from("<i", self._payload, off)
-                    rows.append((e.index, e.class_name, "", off, v, True))
+                    rows.append((e.index, e.class_name, "", off, v, True, None))
 
         if self.usmap is None:
             self.values_hint.setText(
@@ -574,7 +587,9 @@ class MainWindow(QMainWindow):
             self.values_hint.setText(
                 "Named properties recovered from the game's own reflection data. "
                 "Rows marked <i>zero</i> are stored in the header bitmap and occupy "
-                "no bytes; placement stops at the first variable-length property.")
+                "no bytes. Gameplay tags can be swapped for any other name the "
+                "asset already references; adding a brand new tag would need the "
+                "package name table rebuilt.")
         else:
             self.values_hint.setText(
                 "Raw byte offsets, each read as a 32-bit integer. Offsets advance one "
@@ -585,7 +600,7 @@ class MainWindow(QMainWindow):
             rows = [r for r in rows if r[3] in cand]
         staged = {v.offset: v.value for v in self.project.values if v.asset_path == a.path}
         self.values.setRowCount(len(rows))
-        for r, (ei, name, typ, off, val, editable) in enumerate(rows):
+        for r, (ei, name, typ, off, val, editable, tag_index) in enumerate(rows):
             cells = [f"+{ei}", name, typ,
                      str(off) if off >= 0 else "zero",
                      "" if val is None else str(val)]
@@ -598,6 +613,18 @@ class MainWindow(QMainWindow):
                 for c in range(5):
                     self.values.item(r, c).setBackground(QColor("#2d4f1e"))
                     self.values.item(r, c).setForeground(QColor("#d9f2c8"))
+            if tag_index is not None:
+                # Tags are FName references, so the choices are the names this
+                # package already carries.
+                combo = QComboBox()
+                combo.addItems(self._names)
+                current = staged.get(off, tag_index)
+                if current < len(self._names):
+                    combo.setCurrentIndex(current)
+                combo.currentIndexChanged.connect(
+                    lambda idx, o=off, nm=name: self._tag_changed(o, idx, nm))
+                self.values.setCellWidget(r, 5, combo)
+                continue
             new = QTableWidgetItem("" if off not in staged else str(staged[off]))
             new.setData(Qt.UserRole, off)
             if not editable or off < 0:
@@ -693,6 +720,25 @@ class MainWindow(QMainWindow):
         if p:
             self._art_image.save(p)
             self.statusBar().showMessage(f"wrote {p}", 5000)
+
+    def _tag_changed(self, offset, name_index, label):
+        """Stage a gameplay tag swap.
+
+        A tag is an ``FName``, so changing it is a four-byte write of a
+        different index into the package's name table.
+
+        Args:
+            offset (int): Byte offset of the tag's name index.
+            name_index (int): Chosen entry in the package name table.
+            label (str): Row label, used in the edit log.
+        """
+        if not self.current:
+            return
+        name = self._names[name_index] if name_index < len(self._names) else "?"
+        self.project.set_value(self.current.path, offset, name_index,
+                               f"{self.current.name} {label.strip()} = {name}")
+        self._refresh_edits()
+        self.statusBar().showMessage(f"tag set to {name}", 6000)
 
     def _value_changed(self, item):
         """Stage or clear a value edit when a cell is edited.

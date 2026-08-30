@@ -40,6 +40,9 @@ FIELD_NAME = 0x20
 PROP_ARRAY_DIM = 0x30
 PROP_ELEM_SIZE = 0x34
 PROP_FLAGS = 0x38
+# FStructProperty::Struct and FArrayProperty::Inner sit just past FProperty.
+PROP_STRUCT = 0x70
+PROP_INNER = 0x78
 
 BLOCK_BYTES = 0x20000
 """Each FName block spans 65536 two-byte slots."""
@@ -82,6 +85,10 @@ class Property:
         size (int): ``ElementSize``, the bytes one element occupies in memory.
         array_dim (int): Fixed array dimension, normally 1.
         owner (str): Class that declares it, which may be a parent class.
+        struct (str): For a ``StructProperty``, the struct's name, e.g.
+            ``GameplayTagContainer``. Empty otherwise.
+        inner (str): For an ``ArrayProperty``, its element type, e.g.
+            ``ObjectProperty``. Empty otherwise.
     """
 
     index: int
@@ -90,6 +97,8 @@ class Property:
     size: int
     array_dim: int = 1
     owner: str = ""
+    struct: str = ""
+    inner: str = ""
 
 
 @dataclass
@@ -315,13 +324,27 @@ class Reflection:
             while f and self.m.region_of(f) and guard < 512:
                 guard += 1
                 fc = self.m.u64(f + FIELD_CLASS)
+                ptype = (self.name(self.m.u32(fc))
+                         if fc and self.m.region_of(fc) else "?") or "?"
+                struct_name = inner_type = ""
+                if ptype == "StructProperty":
+                    sp = self.m.u64(f + PROP_STRUCT)
+                    struct_name = self.object_name(sp) or ""
+                elif ptype in ("ArrayProperty", "SetProperty"):
+                    ip = self.m.u64(f + PROP_INNER)
+                    if ip and self.m.region_of(ip):
+                        ic = self.m.u64(ip + FIELD_CLASS)
+                        inner_type = (self.name(self.m.u32(ic))
+                                      if ic and self.m.region_of(ic) else "") or ""
                 k.properties.append(Property(
                     index=len(k.properties),
                     name=self.name(self.m.u32(f + FIELD_NAME)) or "?",
-                    type=(self.name(self.m.u32(fc)) if fc and self.m.region_of(fc) else "?") or "?",
+                    type=ptype,
                     size=self.m.u32(f + PROP_ELEM_SIZE) or 0,
                     array_dim=self.m.u32(f + PROP_ARRAY_DIM) or 1,
                     owner=oname,
+                    struct=struct_name,
+                    inner=inner_type,
                 ))
                 f = self.m.u64(f + FIELD_NEXT)
         return k

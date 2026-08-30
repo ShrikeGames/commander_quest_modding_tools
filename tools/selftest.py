@@ -199,6 +199,31 @@ def main():
             if u:
                 pl4 = r.read(u.uexp)
                 cross[nm] = {f.name: f.value for e in u.exports for f in um.place(e, pl4)}
+        arch = by.get("DA_Unit_Human_Archer")
+        if arch:
+            pa2 = r.read(arch.uexp)
+            anames = uasset.parse(r.read(arch.uasset)).names
+            tags = []
+            for e in arch.exports:
+                for f in um.place(e, pa2):
+                    if um.is_tag_container(e, f.index):
+                        tags += [anames[i] for _, i in um.tags(f, pa2) if i < len(anames)]
+            check("gameplay tags resolve to real names",
+                  "Minion.AttackType.Projectile" in tags, str(tags))
+            placed_arch = [f.name for e in arch.exports for f in um.place(e, pa2)]
+            check("a two-tag unit still places its later properties",
+                  "MaxHealth" in placed_arch and "RotationSpeed" in placed_arch)
+
+        total_ex = placed_ex = 0
+        for x in assets:
+            px = r.read(x.uexp)
+            for e in x.exports:
+                total_ex += 1
+                if len(um.place(e, px)) == len(e.prop_indices):
+                    placed_ex += 1
+        check("most exports place completely", placed_ex / total_ex > 0.8,
+              f"{placed_ex}/{total_ex}")
+
         check("more unit stats match the collection screen",
               cross.get("DA_Unit_Neutral_Militia", {}).get("MaxHealth") == 4
               and cross.get("DA_Unit_Neutral_AmbushCavalry", {}).get("MaxHealth") == 8

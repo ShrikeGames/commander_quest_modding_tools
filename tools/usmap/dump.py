@@ -127,7 +127,9 @@ def main():
             "size": k.properties_size,
             "properties": [
                 {"index": p.index, "name": p.name, "type": p.type,
-                 "size": p.size, "owner": p.owner}
+                 "size": p.size, "owner": p.owner,
+                 **({"struct": p.struct} if p.struct else {}),
+                 **({"inner": p.inner} if p.inner else {})}
                 for p in k.properties
             ],
         }
