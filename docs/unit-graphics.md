@@ -24,6 +24,10 @@ MI_Human_Assasin references
 
 So there are three ways in, of very different difficulty.
 
+> **Implemented.** Retexturing and art copying now work; see
+> [replacing textures](textures.md). The rest of this page still describes the
+> mesh side, which does not.
+
 ## Retexturing: possible, but harder than card art
 
 Card art is `PF_B8G8R8A8`, uncompressed BGRA, which is why replacing it is a

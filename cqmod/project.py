@@ -49,14 +49,21 @@ class TextEdit:
 class TextureEdit:
     """A replacement for one texture's art.
 
+    The source is either a local image or another texture already in the game.
+    Copying between game textures re-encodes rather than copying bytes, so the
+    two need not share a size or a pixel format: a 1024x1024 DXT5 source can be
+    written into a 256x256 DXT1 target.
+
     Attributes:
-        texture_path (str): Pak path of the art package, without extension.
-        image_path (str): Local image file. Read at build time, so editing the
-            file and rebuilding picks up the new version.
+        texture_path (str): Pak path of the art package being changed.
+        image_path (str): Local image file, or empty when copying in-game art.
+        source_texture (str): Pak path of a texture to copy from, or empty when
+            using a local file.
     """
 
     texture_path: str
-    image_path: str
+    image_path: str = ""
+    source_texture: str = ""
 
 
 @dataclass
@@ -170,18 +177,20 @@ class Project:
                 return
         self.texts.append(TextEdit(namespace, key, value, locale))
 
-    def set_texture(self, texture_path, image_path):
+    def set_texture(self, texture_path, image_path="", source_texture=""):
         """Stage an art replacement, replacing any existing edit to the same texture.
 
         Args:
-            texture_path (str): Pak path of the art package, without extension.
-            image_path (str): Local image file.
+            texture_path (str): Pak path of the art package being changed.
+            image_path (str): Local image file to use as the source.
+            source_texture (str): Pak path of an in-game texture to copy from,
+                as an alternative to ``image_path``.
         """
         for t in self.textures:
             if t.texture_path == texture_path:
-                t.image_path = image_path
+                t.image_path, t.source_texture = image_path, source_texture
                 return
-        self.textures.append(TextureEdit(texture_path, image_path))
+        self.textures.append(TextureEdit(texture_path, image_path, source_texture))
 
     def set_value(self, asset_path, offset, value, label=""):
         """Stage a value overwrite, replacing any existing edit at the same offset.
@@ -286,12 +295,27 @@ class Project:
 
         from PIL import Image
         for t in self.textures:
-            tex = texture.parse(reader.read(t.texture_path + ".uexp"))
-            img = Image.open(t.image_path)
-            files[t.texture_path + ".uexp"] = texture.replace(tex, img)
+            bulk_path = t.texture_path + ".ubulk"
+            bulk = reader.read(bulk_path) if bulk_path in reader else b""
+            tex = texture.parse(reader.read(t.texture_path + ".uexp"), bulk)
+            if t.source_texture:
+                src_bulk_path = t.source_texture + ".ubulk"
+                src = texture.parse(
+                    reader.read(t.source_texture + ".uexp"),
+                    reader.read(src_bulk_path) if src_bulk_path in reader else b"")
+                img = texture.to_image(src)
+                source_label = Path(t.source_texture).name
+            else:
+                img = Image.open(t.image_path)
+                source_label = Path(t.image_path).name
+            new_uexp, new_bulk = texture.replace(tex, img)
+            files[t.texture_path + ".uexp"] = new_uexp
             files[t.texture_path + ".uasset"] = reader.read(t.texture_path + ".uasset")
-            say(f"  art    {Path(t.texture_path).name} <- {Path(t.image_path).name} "
-                f"({tex.width}x{tex.height})")
+            if new_bulk:
+                files[bulk_path] = new_bulk
+            say(f"  art    {Path(t.texture_path).name} <- {source_label} "
+                f"({tex.width}x{tex.height} {tex.pixel_format}"
+                + (f", {len(tex.mips)} mips" if tex.is_block else "") + ")")
 
         by_locale: dict[str, list] = {}
         for t in self.texts:

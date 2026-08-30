@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QTabWidget, QTextEdit, QPlainTextEdit, QFileDialog,
     QMessageBox, QHeaderView, QAbstractItemView, QComboBox, QGroupBox,
     QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy, QComboBox,
+    QInputDialog,
 )
 
 from datetime import datetime
@@ -77,6 +78,7 @@ class MainWindow(QMainWindow):
         self.mods = ModManager(config.paks_dir(), config.mods_dir(), config.pak_path())
         self.usmap = None
         self.all_tags = []
+        self.art_paths = []
         self._payload = b""
 
         self._build_ui()
@@ -212,10 +214,17 @@ class MainWindow(QMainWindow):
         self.replace_art_btn = QPushButton("Replace art...")
         self.replace_art_btn.clicked.connect(self._replace_art)
         self.replace_art_btn.setEnabled(False)
+        self.copy_art_btn = QPushButton("Copy from game art...")
+        self.copy_art_btn.setToolTip(
+            "Use another texture from the game. It is re-encoded to this "
+            "texture's size and format, so the two need not match.")
+        self.copy_art_btn.clicked.connect(self._copy_art)
+        self.copy_art_btn.setEnabled(False)
         self.export_art_btn = QPushButton("Export PNG...")
         self.export_art_btn.clicked.connect(self._export_art)
         self.export_art_btn.setEnabled(False)
-        row.addWidget(self.replace_art_btn); row.addWidget(self.export_art_btn); row.addStretch()
+        row.addWidget(self.replace_art_btn); row.addWidget(self.copy_art_btn)
+        row.addWidget(self.export_art_btn); row.addStretch()
         lay.addLayout(row)
         self.tabs.addTab(page, "Art")
 
@@ -442,6 +451,9 @@ class MainWindow(QMainWindow):
             self.usmap = usmap.Usmap.load()
             n = self.usmap.solve_sizes(reader, assets)
             self.all_tags = self.usmap.collect_tags(reader, assets)
+            self.art_paths = sorted(
+                p[:-5] for p in reader.files()
+                if p.endswith(".uexp") and Path(p).name.startswith("T_"))
             self.statusBar().showMessage(
                 f"resolved {n} struct/array sizes, {len(self.all_tags)} gameplay tags", 6000)
         except usmap.UsmapError:
@@ -568,22 +580,28 @@ class MainWindow(QMainWindow):
         """
         self.art.clear(); self.art_info.setText("")
         self.replace_art_btn.setEnabled(False); self.export_art_btn.setEnabled(False)
+        self.copy_art_btn.setEnabled(False)
         if not a.texture or (a.texture + ".uexp") not in self.reader:
             self.art.setText("no art"); return
         try:
-            tex = texture.parse(self.reader.read(a.texture + ".uexp"))
-            img = texture.to_png_bytes(tex)
+            bulk_path = a.texture + ".ubulk"
+            bulk = self.reader.read(bulk_path) if bulk_path in self.reader else b""
+            tex = texture.parse(self.reader.read(a.texture + ".uexp"), bulk)
+            img = texture.to_image(tex)
             self._art_image = img
             data = img.tobytes("raw", "RGBA")
             qi = QImage(data, img.width, img.height, QImage.Format_RGBA8888)
             self.art.setPixmap(QPixmap.fromImage(qi).scaled(
                 QSize(430, 430), Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            pending = next((t.image_path for t in self.project.textures
-                            if t.texture_path == a.texture), None)
+            edit = next((t for t in self.project.textures
+                         if t.texture_path == a.texture), None)
+            pending = (edit.image_path or edit.source_texture) if edit else None
             self.art_info.setText(
                 f"{tex.width}x{tex.height} {tex.pixel_format}"
+                + (f", {len(tex.mips)} mips" if tex.is_block else "")
                 + (f"   <b style='color:{ACCENT}'>staged: {Path(pending).name}</b>" if pending else ""))
             self.replace_art_btn.setEnabled(True); self.export_art_btn.setEnabled(True)
+            self.copy_art_btn.setEnabled(True)
         except Exception as e:
             self.art.setText(f"cannot display art:\n{e}")
 
@@ -773,6 +791,29 @@ class MainWindow(QMainWindow):
             self.project.set_texture(a.texture, p)
             self._refresh_edits(); self._load_art(a)
 
+    def _copy_art(self):
+        """Replace this asset's art with another texture from the game.
+
+        The source is re-encoded to the target's size and pixel format, so a
+        large uncompressed source can be written into a small block-compressed
+        target without the user matching them up.
+        """
+        a = self.current
+        if not a or not self.art_paths:
+            return
+        pick, ok = QInputDialog.getItem(
+            self, "Copy art from", "Texture:",
+            [Path(p).name for p in self.art_paths], 0, True)
+        if not ok or not pick:
+            return
+        src = next((p for p in self.art_paths if Path(p).name == pick), None)
+        if not src:
+            QMessageBox.warning(self, "Not found", f"No texture named {pick}")
+            return
+        self.project.set_texture(a.texture, source_texture=src)
+        self._refresh_edits(); self._load_art(a)
+        self.statusBar().showMessage(f"art will be copied from {pick}", 8000)
+
     def _export_art(self):
         """Save the current asset's art to a PNG file.
         """
@@ -836,7 +877,8 @@ class MainWindow(QMainWindow):
         for t in p.texts:
             lines.append(f"text    [{t.locale}] {t.namespace}/{t.key} = {t.value!r}")
         for t in p.textures:
-            lines.append(f"art     {Path(t.texture_path).name} <- {t.image_path}")
+            src = t.image_path or f"game art: {Path(t.source_texture).name}"
+            lines.append(f"art     {Path(t.texture_path).name} <- {src}")
         for v in p.values:
             lines.append(f"value   {Path(v.asset_path).name} @{v.offset} = {v.value}")
         for t in p.tags:

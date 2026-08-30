@@ -13,7 +13,7 @@ loads at startup.
 | **Browse** | All 1,492 data assets, filtered by class, searchable by name and text |
 | **View** | Card art, title/description, class, export layout, raw property values |
 | **Edit text** | Titles and descriptions, via the localization resource |
-| **Edit art** | Replace card art with any PNG (auto-scaled and centre-cropped) |
+| **Edit art** | Replace card or unit art with any PNG, or copy art between assets |
 | **Edit values** | Overwrite integers in export payloads by offset |
 | **Named properties** | Real property names and types, recovered from the running game |
 | **Follow links** | Jump from a summon card to the unit holding its stats |
@@ -87,6 +87,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
 | [Property names](docs/property-names.md) | Recovering the real schema from the running game |
 | [Unit graphics](docs/unit-graphics.md) | How units are drawn, and what replacing them would take |
+| [Replacing textures](docs/textures.md) | Block compression, mip chains, and art swapping |
 | [Architecture](docs/architecture.md) | Module map and data flow |
 | [Limitations](docs/limitations.md) | What these tools cannot do, and why |
 | [Reverse engineering notes](docs/reverse-engineering.md) | How the format was worked out |

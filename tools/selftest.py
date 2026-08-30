@@ -96,7 +96,29 @@ def main():
     check("card art is uncompressed BGRA", tex.pixel_format == "PF_B8G8R8A8",
           f"{tex.width}x{tex.height}")
     img = texture.to_png_bytes(tex)
-    check("texture decode/encode round-trips", texture.replace(tex, img) == tex.raw)
+    check("texture decode/encode round-trips", texture.replace(tex, img)[0] == tex.raw)
+
+    unit_tex = "Commander/Content/ArtAssets/Model/Human/Human_Texture/T_Human_Assasin_D"
+    if unit_tex + ".uexp" in r:
+        ue = r.read(unit_tex + ".uexp")
+        ub = r.read(unit_tex + ".ubulk") if unit_tex + ".ubulk" in r else b""
+        bt = texture.parse(ue, ub)
+        check("unit textures are block compressed with a mip chain",
+              bt.is_block and len(bt.mips) > 1,
+              f"{bt.pixel_format}, {len(bt.mips)} mips")
+        check("the mip chain accounts for the whole bulk file",
+              sum(m.size for m in bt.mips if m.where == "ubulk") == len(ub),
+              f"{len(ub)} bytes")
+        new_ue, new_ub = texture.replace(bt, texture.to_image(bt))
+        check("re-encoding a block texture preserves both file lengths",
+              len(new_ue) == len(ue) and len(new_ub) == len(ub))
+        import numpy as _np
+        a1 = _np.asarray(texture.to_image(bt).convert("RGB"), dtype=_np.int16)
+        a2 = _np.asarray(texture.to_image(texture.parse(new_ue, new_ub)).convert("RGB"),
+                         dtype=_np.int16)
+        check("the block encoder round-trips within tolerance",
+              _np.abs(a1 - a2).mean() < 4.0,
+              f"mean error {_np.abs(a1 - a2).mean():.2f}/255")
 
     print("\npak writer:")
     files = [("Commander/Content/A/x.uexp", bytes(range(256)) * 5),

@@ -13,6 +13,7 @@ game data.
 | [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
 | [Property names](property-names.md) | Recovering the real schema from the running game |
 | [Unit graphics](unit-graphics.md) | How units are drawn, and what replacing them would take |
+| [Replacing textures](textures.md) | Block compression, mip chains, and art swapping |
 | [Limitations](limitations.md) | What these tools cannot do, and why |
 
 ## Reference
