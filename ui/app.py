@@ -76,6 +76,7 @@ class MainWindow(QMainWindow):
         self.project_path: Path | None = None
         self.mods = ModManager(config.paks_dir(), config.mods_dir(), config.pak_path())
         self.usmap = None
+        self.all_tags = []
         self._payload = b""
 
         self._build_ui()
@@ -435,7 +436,9 @@ class MainWindow(QMainWindow):
         try:
             self.usmap = usmap.Usmap.load()
             n = self.usmap.solve_sizes(reader, assets)
-            self.statusBar().showMessage(f"resolved {n} struct/array sizes", 5000)
+            self.all_tags = self.usmap.collect_tags(reader, assets)
+            self.statusBar().showMessage(
+                f"resolved {n} struct/array sizes, {len(self.all_tags)} gameplay tags", 6000)
         except usmap.UsmapError:
             self.usmap = None
         classes = sorted({a.class_name for a in assets if a.class_name})
@@ -599,6 +602,7 @@ class MainWindow(QMainWindow):
         if cand and self.only_cand.isChecked():
             rows = [r for r in rows if r[3] in cand]
         staged = {v.offset: v.value for v in self.project.values if v.asset_path == a.path}
+        staged_tags = {t.offset: t.tag for t in self.project.tags if t.asset_path == a.path}
         self.values.setRowCount(len(rows))
         for r, (ei, name, typ, off, val, editable, tag_index) in enumerate(rows):
             cells = [f"+{ei}", name, typ,
@@ -617,12 +621,16 @@ class MainWindow(QMainWindow):
                 # Tags are FName references, so the choices are the names this
                 # package already carries.
                 combo = QComboBox()
-                combo.addItems(self._names)
-                current = staged.get(off, tag_index)
-                if current < len(self._names):
-                    combo.setCurrentIndex(current)
-                combo.currentIndexChanged.connect(
-                    lambda idx, o=off, nm=name: self._tag_changed(o, idx, nm))
+                choices = list(self.all_tags)
+                current_tag = staged_tags.get(off) or (
+                    self._names[tag_index] if tag_index < len(self._names) else "")
+                if current_tag and current_tag not in choices:
+                    choices.insert(0, current_tag)
+                combo.addItems(choices)
+                if current_tag in choices:
+                    combo.setCurrentIndex(choices.index(current_tag))
+                combo.currentTextChanged.connect(
+                    lambda text, o=off, nm=name: self._tag_changed(o, text, nm))
                 self.values.setCellWidget(r, 5, combo)
                 continue
             new = QTableWidgetItem("" if off not in staged else str(staged[off]))
@@ -721,24 +729,22 @@ class MainWindow(QMainWindow):
             self._art_image.save(p)
             self.statusBar().showMessage(f"wrote {p}", 5000)
 
-    def _tag_changed(self, offset, name_index, label):
-        """Stage a gameplay tag swap.
+    def _tag_changed(self, offset, tag, label):
+        """Stage a gameplay tag change.
 
-        A tag is an ``FName``, so changing it is a four-byte write of a
-        different index into the package's name table.
+        Any tag used anywhere in the game can be chosen. If this asset has never
+        referenced it, the build appends the name to the package's name table.
 
         Args:
             offset (int): Byte offset of the tag's name index.
-            name_index (int): Chosen entry in the package name table.
-            label (str): Row label, used in the edit log.
+            tag (str): The tag to set.
+            label (str): Row label, unused beyond readability.
         """
-        if not self.current:
+        if not self.current or not tag:
             return
-        name = self._names[name_index] if name_index < len(self._names) else "?"
-        self.project.set_value(self.current.path, offset, name_index,
-                               f"{self.current.name} {label.strip()} = {name}")
+        self.project.set_tag(self.current.path, offset, tag)
         self._refresh_edits()
-        self.statusBar().showMessage(f"tag set to {name}", 6000)
+        self.statusBar().showMessage(f"tag set to {tag}", 6000)
 
     def _value_changed(self, item):
         """Stage or clear a value edit when a cell is edited.
@@ -778,8 +784,10 @@ class MainWindow(QMainWindow):
             lines.append(f"art     {Path(t.texture_path).name} <- {t.image_path}")
         for v in p.values:
             lines.append(f"value   {Path(v.asset_path).name} @{v.offset} = {v.value}")
+        for t in p.tags:
+            lines.append(f"tag     {Path(t.asset_path).name} @{t.offset} = {t.tag}")
         self.edits.setPlainText("\n".join(lines) or "(no edits staged)")
-        n = len(p.texts) + len(p.textures) + len(p.values)
+        n = len(p.texts) + len(p.textures) + len(p.values) + len(p.tags)
         self.tabs.setTabText(3, f"Pending edits ({n})" if n else "Pending edits")
 
     def _clear_edits(self):

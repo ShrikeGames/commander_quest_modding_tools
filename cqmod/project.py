@@ -21,7 +21,7 @@ import json, struct
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from . import locres, texture
+from . import locres, texture, uasset
 from .pak import build_pak
 
 LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
@@ -78,6 +78,25 @@ class ValueEdit:
 
 
 @dataclass
+class TagEdit:
+    """A gameplay tag swap.
+
+    Tags are ``FName`` values, indices into the owning package's name table, so
+    setting one to a tag the asset has never used requires appending that name
+    to the table first. The build does that automatically.
+
+    Attributes:
+        asset_path (str): Pak path of the asset, without extension.
+        offset (int): Byte offset of the tag's name index in the ``.uexp``.
+        tag (str): The tag to set, e.g. ``Card.SummonType.Cavalry``.
+    """
+
+    asset_path: str
+    offset: int
+    tag: str
+
+
+@dataclass
 class Project:
     """A named collection of staged edits.
 
@@ -92,6 +111,7 @@ class Project:
     texts: list = field(default_factory=list)
     textures: list = field(default_factory=list)
     values: list = field(default_factory=list)
+    tags: list = field(default_factory=list)
 
     def save(self, path) -> None:
         """Write the project to JSON.
@@ -104,6 +124,7 @@ class Project:
             "texts": [asdict(t) for t in self.texts],
             "textures": [asdict(t) for t in self.textures],
             "values": [asdict(v) for v in self.values],
+            "tags": [asdict(t) for t in self.tags],
         }, indent=1))
 
     @classmethod
@@ -122,6 +143,7 @@ class Project:
             texts=[TextEdit(**x) for x in d.get("texts", [])],
             textures=[TextureEdit(**x) for x in d.get("textures", [])],
             values=[ValueEdit(**x) for x in d.get("values", [])],
+            tags=[TagEdit(**x) for x in d.get("tags", [])],
         )
 
     @property
@@ -131,7 +153,7 @@ class Project:
         Returns:
             bool: True if there is nothing to build.
         """
-        return not (self.texts or self.textures or self.values)
+        return not (self.texts or self.textures or self.values or self.tags)
 
     def set_text(self, namespace, key, value, locale="en"):
         """Stage a text change, replacing any existing edit to the same key.
@@ -176,6 +198,20 @@ class Project:
                 return
         self.values.append(ValueEdit(asset_path, offset, value, label))
 
+    def set_tag(self, asset_path, offset, tag):
+        """Stage a gameplay tag change, replacing any edit at the same offset.
+
+        Args:
+            asset_path (str): Pak path of the asset, without extension.
+            offset (int): Byte offset of the tag's name index.
+            tag (str): Tag to set.
+        """
+        for t in self.tags:
+            if (t.asset_path, t.offset) == (asset_path, offset):
+                t.tag = tag
+                return
+        self.tags.append(TagEdit(asset_path, offset, tag))
+
     def clear_asset(self, asset_path):
         """Drop every staged value edit for one asset.
 
@@ -216,20 +252,37 @@ class Project:
 
         files: dict[str, bytes] = {}
 
-        by_asset: dict[str, list] = {}
-        for v in self.values:
-            by_asset.setdefault(v.asset_path, []).append(v)
-        for asset, edits in by_asset.items():
+        # Value and tag edits both rewrite an asset, so they are applied
+        # together: a tag may need a name appended to the header, and the
+        # resulting index is then written into the payload.
+        touched = {v.asset_path for v in self.values} | {t.asset_path for t in self.tags}
+        for asset in sorted(touched):
+            header = reader.read(asset + ".uasset")
             payload = bytearray(reader.read(asset + ".uexp"))
-            for v in edits:
+
+            for t in [x for x in self.tags if x.asset_path == asset]:
+                names = uasset.parse(header).names
+                if t.tag in names:
+                    index = names.index(t.tag)
+                else:
+                    header = uasset.add_name(header, t.tag)
+                    index = len(names)
+                    say(f"  name   {Path(asset).name} += {t.tag!r} (index {index})")
+                if not (0 <= t.offset <= len(payload) - 4):
+                    raise ValueError(f"{asset}: tag offset {t.offset} outside .uexp")
+                struct.pack_into("<I", payload, t.offset, index)
+                say(f"  tag    {Path(asset).name} @{t.offset} = {t.tag}")
+
+            for v in [x for x in self.values if x.asset_path == asset]:
                 if not (0 <= v.offset <= len(payload) - 4):
                     raise ValueError(f"{asset}: offset {v.offset} outside .uexp "
                                      f"(0..{len(payload)-4})")
                 struct.pack_into("<i", payload, v.offset, v.value)
                 say(f"  value  {Path(asset).name} @{v.offset} = {v.value}"
                     + (f"  ({v.label})" if v.label else ""))
+
             files[asset + ".uexp"] = bytes(payload)
-            files[asset + ".uasset"] = reader.read(asset + ".uasset")
+            files[asset + ".uasset"] = header
 
         from PIL import Image
         for t in self.textures:

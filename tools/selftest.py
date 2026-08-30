@@ -247,6 +247,58 @@ def main():
     zero_seen = any(e.zero_indices for a in assets for e in a.exports)
     check("zero-valued properties are decoded from the header bitmap", zero_seen)
 
+    print("\nname table insertion:")
+    data_assets = [p for p in r.files()
+                   if p.endswith(".uasset") and p.startswith("Commander/Content/Data/")]
+    ok = bad = 0
+    for path in data_assets:
+        raw0 = r.read(path)
+        try:
+            before0 = uasset.parse(raw0)
+            grown = uasset.add_name(raw0, "CQMOD.SelfTest")
+            after0 = uasset.parse(grown)
+        except Exception:
+            bad += 1
+            continue
+        if (after0.header_size == len(grown)
+                and before0.names == after0.names[:-1]
+                and after0.names[-1] == "CQMOD.SelfTest"
+                and len(before0.exports) == len(after0.exports)
+                and all(b.uexp_slice(before0.header_size) == a2.uexp_slice(after0.header_size)
+                        for b, a2 in zip(before0.exports, after0.exports))):
+            ok += 1
+        else:
+            bad += 1
+    check("every data asset survives a name table insertion", bad == 0,
+          f"{ok}/{len(data_assets)}")
+
+    arch2 = by.get("DA_Unit_Human_Archer")
+    if arch2 and um:
+        pay = r.read(arch2.uexp)
+        tag_off = None
+        for e in arch2.exports:
+            for f in um.place(e, pay):
+                if um.is_tag_container(e, f.index):
+                    t = um.tags(f, pay)
+                    if t:
+                        tag_off = t[0][0]
+        if tag_off is not None:
+            proj2 = Project(name="TagCheck")
+            proj2.set_tag(arch2.path, tag_off, "Minion.Type.Cavalry")
+            raw2 = proj2.build(r)
+            with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f2:
+                f2.write(raw2); tmp2 = f2.name
+            m2 = PakReader(tmp2)
+            nh = m2.read(arch2.uasset); nx = m2.read(arch2.uexp)
+            pk2 = uasset.parse(nh)
+            idx2 = struct.unpack_from("<I", nx, tag_off)[0]
+            check("a tag the asset never used can be set",
+                  pk2.names[idx2] == "Minion.Type.Cavalry",
+                  pk2.names[idx2] if idx2 < len(pk2.names) else "?")
+            check("the grown header stays self-consistent",
+                  pk2.header_size == len(nh) and len(nx) == len(pay))
+            m2.close(); Path(tmp2).unlink()
+
     m.close(); Path(tmp).unlink()
     r.close()
 

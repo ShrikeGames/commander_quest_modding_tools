@@ -147,11 +147,25 @@ A tag is an `FName`, which is an index into the owning package's name table, so
 changing one is a four-byte write and the editor offers a dropdown of the names
 that package carries.
 
-**You can only pick a name the asset already references.** Archer's package has
-29 names of which two are tags, so those are the only choices. Introducing a tag
-the asset has never used would mean appending to the package name table, which
-shifts every offset in the header and each export's `SerialOffset`. That is not
-implemented.
+Any of the 42 tags used anywhere in the game can be chosen, not just the ones a
+package happens to reference. If the asset has never used a tag, its name is
+appended to the package name table at build time.
+
+Growing that table shifts everything after it, so the insertion rewrites
+`TotalHeaderSize`, every offset field in the summary, the generation record's
+name count, and each export's `SerialOffset`. Export payloads are untouched, and
+because the header size and the serial offsets move together, every export still
+resolves to exactly the same bytes of the `.uexp`.
+
+This was only attempted after parsing the summary end to end and confirming the
+walk lands precisely on `NameOffset`, which is what proves no field was missed.
+All **1,790** data assets survive an insertion with their names, imports, exports
+and payload slices intact, and the self-test checks that on every one of them.
+
+One asset caught a real bug: `DA_Gear_Priest'sBreastplate` has a Unicode
+apostrophe in its name, so its package name string is UTF-16 with a negative
+length. Stepping over it as though the length were positive walked backwards
+through the file.
 
 ## What is still not named
 

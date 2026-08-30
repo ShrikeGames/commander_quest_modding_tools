@@ -232,3 +232,175 @@ def parse(data: bytes) -> Package:
     for e in pkg.exports:
         e.class_name = pkg.resolve(e.class_index)
     return pkg
+
+
+# Offsets in the summary that point past the name table, as
+# (byte offset from the end of NameOffset, width in bytes). Anything positive
+# in these fields shifts when the name table grows. Fields holding 0 or -1 are
+# absent rather than located, so they are left alone.
+_SHIFTING_FIELDS = [
+    (0, 4),    # SoftObjectPathsOffset is at +4 of its count
+]
+
+
+def _skip_fstring(data: bytes, o: int) -> int:
+    """Step over an ``FString`` without decoding it.
+
+    A negative length means UTF-16, so the character data is twice as long.
+    Assuming positive lengths walks backwards through the file on any package
+    whose name contains a non-ASCII character.
+
+    Args:
+        data (bytes): Buffer being walked.
+        o (int): Offset of the length prefix.
+
+    Returns:
+        int: Offset just past the string.
+    """
+    (n,) = struct.unpack_from("<i", data, o)
+    return o + 4 + (n if n >= 0 else -n * 2)
+
+
+def _summary_end(data: bytes):
+    """Parse the summary far enough to locate every field that can shift.
+
+    The summary runs from the file start to ``NameOffset``, and every layout
+    field is read here so that insertion can adjust all of them. The caller
+    checks that parsing lands exactly on ``NameOffset``, which is what proves
+    the layout is fully understood for this build.
+
+    Args:
+        data (bytes): A complete ``.uasset``.
+
+    Returns:
+        dict: Field positions and values, including ``end`` where the summary
+        finishes and ``shift_positions`` listing every offset field to adjust.
+
+    Raises:
+        AssetError: If the parse does not land on ``NameOffset``.
+    """
+    o = 8 + 16
+    (ncv,) = struct.unpack_from("<i", data, o); o += 4 + 20 * ncv
+    total_header_pos = o; o += 4
+    o = _skip_fstring(data, o)                      # PackageName
+    o += 4                                          # PackageFlags
+    name_count_pos = o
+    (name_count, name_offset) = struct.unpack_from("<ii", data, o); o += 8
+
+    # Count/offset pairs and bare offsets, in file order.
+    pairs = []
+    for _ in range(2):                              # soft object paths, gatherable text
+        pairs.append(o + 4); o += 8
+    export_count_pos = o
+    (export_count, _) = struct.unpack_from("<ii", data, o)
+    pairs.append(o + 4); o += 8                     # export count/offset
+    (import_count, _) = struct.unpack_from("<ii", data, o)
+    pairs.append(o + 4); o += 8                     # import count/offset
+    pairs.append(o); o += 4                         # DependsOffset
+    pairs.append(o + 4); o += 8                     # soft package refs count/offset
+    pairs.append(o); o += 4                         # SearchableNamesOffset
+    pairs.append(o); o += 4                         # ThumbnailTableOffset
+    o += 16                                         # Guid
+
+    (gen_count,) = struct.unpack_from("<i", data, o); o += 4
+    # FGenerationInfo is two int32s: ExportCount then NameCount.
+    gen_name_positions = [o + 8 * i + 4 for i in range(gen_count)]
+    o += 8 * gen_count
+    for _ in range(2):                              # saved-by / compatible-with versions
+        o = _skip_fstring(data, o + 10)             # version fields then Branch
+    o += 4                                          # CompressionFlags
+    (chunks,) = struct.unpack_from("<i", data, o); o += 4
+    if chunks:
+        raise AssetError("compressed chunks are not supported")
+    o += 4                                          # PackageSource
+    (extra,) = struct.unpack_from("<i", data, o); o += 4
+    for _ in range(extra):
+        o = _skip_fstring(data, o)
+    pairs.append(o); o += 4                         # AssetRegistryDataOffset
+    bulk_pos = o; o += 8                            # BulkDataStartOffset (int64)
+    pairs.append(o); o += 4                         # WorldTileInfoDataOffset
+    (chunk_ids,) = struct.unpack_from("<i", data, o); o += 4 + 4 * chunk_ids
+    o += 4                                          # PreloadDependencyCount
+    pairs.append(o); o += 4                         # PreloadDependencyOffset
+    o += 4                                          # NamesReferencedFromExportDataCount
+    o += 8                                          # PayloadTocOffset (int64, often -1)
+    pairs.append(o); o += 4                         # DataResourceOffset
+
+    if o != name_offset:
+        raise AssetError(
+            f"summary parse ended at {o} but the name table starts at {name_offset}")
+    return {
+        "end": o,
+        "total_header_pos": total_header_pos,
+        "name_count_pos": name_count_pos,
+        "name_count": name_count,
+        "name_offset": name_offset,
+        "export_count": export_count,
+        "export_count_pos": export_count_pos,
+        "shift32": pairs,
+        "shift64": [bulk_pos],
+        "gen_name_positions": gen_name_positions,
+    }
+
+
+def add_name(data: bytes, new_name: str) -> bytes:
+    """Append an entry to a package's name table.
+
+    Every gameplay tag is an ``FName``, an index into this table, so a tag the
+    asset has never referenced cannot be set until its name exists here. Growing
+    the table shifts everything after it, so each summary offset, the total
+    header size and every export's ``SerialOffset`` are adjusted by the same
+    delta. Export payloads themselves are untouched, and because both the header
+    size and the serial offsets move together, each export still resolves to the
+    same bytes of the ``.uexp``.
+
+    Args:
+        data (bytes): The original ``.uasset``.
+        new_name (str): Name to append, e.g. ``Card.SummonType.Cavalry``.
+
+    Returns:
+        bytes: A rebuilt ``.uasset`` whose last name is ``new_name``.
+
+    Raises:
+        AssetError: If the name is already present, the summary cannot be fully
+            parsed, or the package uses features this does not handle.
+    """
+    pkg = parse(data)
+    if new_name in pkg.names:
+        raise AssetError(f"{new_name!r} is already in the name table")
+    if any(ord(c) > 127 for c in new_name):
+        raise AssetError("only ASCII names are supported")
+
+    s = _summary_end(data)
+    entry = struct.pack("<i", len(new_name) + 1) + new_name.encode("ascii") + b"\0"
+    entry += b"\0" * 4                              # the two name hashes
+    delta = len(entry)
+
+    # The name table ends where the section after it begins, which is the
+    # smallest positive offset in the summary.
+    following = [struct.unpack_from("<i", data, p)[0] for p in s["shift32"]]
+    table_end = min([v for v in following if v > s["name_offset"]] or [len(data)])
+
+    out = bytearray(data[:table_end]) + entry + data[table_end:]
+
+    struct.pack_into("<i", out, s["name_count_pos"], s["name_count"] + 1)
+    struct.pack_into("<i", out, s["total_header_pos"],
+                     struct.unpack_from("<i", data, s["total_header_pos"])[0] + delta)
+    for p in s["shift32"]:
+        v = struct.unpack_from("<i", data, p)[0]
+        if v > s["name_offset"]:
+            struct.pack_into("<i", out, p, v + delta)
+    for p in s["shift64"]:
+        v = struct.unpack_from("<q", data, p)[0]
+        if v > s["name_offset"]:
+            struct.pack_into("<q", out, p, v + delta)
+    for p in s["gen_name_positions"]:
+        struct.pack_into("<i", out, p, struct.unpack_from("<i", data, p)[0] + 1)
+
+    # Export payloads live in the .uexp, but their offsets are measured from the
+    # start of the logical package, so they move with the header.
+    export_offset = struct.unpack_from("<i", out, s["export_count_pos"] + 4)[0]
+    for k in range(s["export_count"]):
+        p = export_offset + k * EXPORT_STRIDE + 36
+        struct.pack_into("<q", out, p, struct.unpack_from("<q", out, p)[0] + delta)
+    return bytes(out)

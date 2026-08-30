@@ -164,6 +164,36 @@ class Usmap:
         e = self.data.get(class_name)
         return e["properties"] if e else []
 
+    @staticmethod
+    def collect_tags(reader, assets) -> list:
+        """Gather every gameplay tag name used anywhere in the game.
+
+        A package only lists the names it references, so its own table is a poor
+        menu of tags to choose from. Scanning every asset's name table gives the
+        full vocabulary; a tag missing from a package is added to it at build
+        time.
+
+        Args:
+            reader (cqmod.pak.PakReader): An open archive.
+            assets (list[cqmod.catalog.Asset]): The catalog to scan.
+
+        Returns:
+            list[str]: Tag names, sorted.
+        """
+        from . import uasset
+
+        found = set()
+        for a in assets:
+            try:
+                names = uasset.parse(reader.read(a.uasset)).names
+            except Exception:
+                continue
+            for n in names:
+                if "." in n and not n.startswith("/") and n[0].isupper() \
+                        and all(part and part[0].isalnum() for part in n.split(".")):
+                    found.add(n)
+        return sorted(found)
+
     def tags(self, field, payload: bytes) -> list:
         """Read the gameplay tags held by a tag container property.
 
