@@ -147,3 +147,61 @@ def parse(data: bytes, off: int = 0) -> Header:
         o += width
         zeros = {p for n, p in enumerate(masked) if mask >> n & 1}
     return Header(frags, indices, o - off, zero_bits, zeros)
+
+
+def build(indices, zero_indices=()) -> bytes:
+    """Serialize an unversioned property header.
+
+    Consecutive present indices become one fragment; a gap starts a new one.
+    Runs longer than a fragment can express are split. Fragments containing a
+    zero-valued property set the zero flag, and a bitmap follows listing which
+    of their values are zero.
+
+    Args:
+        indices (Iterable[int]): Property indices carrying a value, ascending.
+        zero_indices (Iterable[int]): Of those, the ones whose value is zero.
+
+    Returns:
+        bytes: A header that :func:`parse` reads back to the same indices.
+
+    Raises:
+        ValueError: If an index gap exceeds what a fragment can skip and cannot
+            be bridged, which does not occur in this game's data.
+    """
+    idx = sorted(set(indices))
+    zeros = set(zero_indices)
+    runs = []
+    for i in idx:
+        if runs and i == runs[-1][-1] + 1 and len(runs[-1]) < 127:
+            runs[-1].append(i)
+        else:
+            runs.append([i])
+
+    frags, prev_end = [], 0
+    for run in runs:
+        skip = run[0] - prev_end
+        while skip > 127:
+            # Bridge an oversized gap with an empty fragment.
+            frags.append(Fragment(127, False, False, 0))
+            skip -= 127
+        frags.append(Fragment(skip, any(i in zeros for i in run), False, len(run)))
+        prev_end = run[-1] + 1
+    if not frags:
+        frags = [Fragment(0, False, True, 0)]
+    frags[-1].is_last = True
+
+    out = bytearray()
+    for f in frags:
+        out += struct.pack("<H", f.pack())
+
+    masked = [i for f, run in zip([f for f in frags if f.value_count], runs)
+              if f.has_zeroes for i in run]
+    if masked:
+        bits = 0
+        for n, i in enumerate(masked):
+            if i in zeros:
+                bits |= 1 << n
+        width = 1 if len(masked) <= 8 else 2 if len(masked) <= 16 \
+            else ((len(masked) + 31) // 32) * 4
+        out += bits.to_bytes(width, "little")
+    return bytes(out)

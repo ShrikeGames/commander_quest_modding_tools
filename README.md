@@ -14,7 +14,7 @@ loads at startup.
 | **View** | Card art, title/description, class, export layout, raw property values |
 | **Edit text** | Titles and descriptions, via the localization resource |
 | **Edit art** | Replace card or unit art with any PNG, or copy art between assets |
-| **Edit values** | Overwrite integers in export payloads by offset |
+| **Edit values** | Overwrite integers in export payloads, or add a stat an asset does not set |
 | **Named properties** | Real property names and types, recovered from the running game |
 | **Follow links** | Jump from a summon card to the unit holding its stats |
 | **Edit decks** | Change the cards a commander starts with |
@@ -87,6 +87,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
 | [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
 | [Starting decks](docs/starting-decks.md) | Editing what cards a commander begins with |
+| [Adding properties](docs/adding-properties.md) | Giving an asset a stat it does not set |
 | [Property names](docs/property-names.md) | Recovering the real schema from the running game |
 | [Unit graphics](docs/unit-graphics.md) | How units are drawn, and what replacing them would take |
 | [Replacing textures](docs/textures.md) | Block compression, mip chains, and art swapping |

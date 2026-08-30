@@ -227,6 +227,44 @@ def build(reader, locale: str = DEFAULT_LOCALE, progress=None) -> list:
     return out
 
 
+def build_one(reader, base_path):
+    """Index a single asset by pak path.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        base_path (str): Pak path without extension.
+
+    Returns:
+        list[Asset]: A one-element list, or empty if the asset cannot be read.
+    """
+    saved = globals()["_single"] = base_path
+    out = []
+    try:
+        pkg = uasset.parse(reader.read(base_path + ".uasset"))
+        payload = reader.read(base_path + ".uexp")
+    except Exception:
+        return out
+    aname = Path(base_path).name
+    primary = next((e for e in pkg.exports if e.object_name == aname),
+                   pkg.exports[0] if pkg.exports else None)
+    a = Asset(path=base_path, package=pkg.name, name=aname,
+              class_name=primary.class_name if primary else "",
+              category="", texture=_texture_package(pkg))
+    for i, e in enumerate(pkg.exports):
+        s2, t2 = e.uexp_slice(pkg.header_size)
+        info = ExportInfo(i + 1, e.object_name, e.class_name, s2, t2)
+        if 0 <= s2 < t2 <= len(payload):
+            try:
+                h = unversioned.parse(payload, s2)
+                info.prop_indices, info.header_bytes = h.indices, h.size
+                info.zero_indices = sorted(h.zero_indices)
+            except Exception:
+                pass
+        a.exports.append(info)
+    out.append(a)
+    return out
+
+
 def save(assets, path) -> None:
     """Write a catalog to JSON.
 

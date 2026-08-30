@@ -404,3 +404,44 @@ def add_name(data: bytes, new_name: str) -> bytes:
         p = export_offset + k * EXPORT_STRIDE + 36
         struct.pack_into("<q", out, p, struct.unpack_from("<q", out, p)[0] + delta)
     return bytes(out)
+
+
+def resize_export(data: bytes, export_index: int, delta: int) -> bytes:
+    """Adjust a package header after one export's payload changed length.
+
+    An export's payload lives in the ``.uexp`` but its size and position are
+    recorded here, so growing it means correcting this export's ``SerialSize``,
+    every later export's ``SerialOffset``, and the bulk data start, which sits
+    past the end of the payload region. The header's own length does not change.
+
+    Args:
+        data (bytes): The original ``.uasset``.
+        export_index (int): Zero-based index of the export that changed.
+        delta (int): Bytes added, or removed if negative.
+
+    Returns:
+        bytes: The corrected ``.uasset``.
+
+    Raises:
+        AssetError: If the export index is out of range.
+    """
+    pkg = parse(data)
+    if not 0 <= export_index < len(pkg.exports):
+        raise AssetError(f"export {export_index} out of range")
+    s = _summary_end(data)
+    out = bytearray(data)
+    export_offset = struct.unpack_from("<i", data, s["export_count_pos"] + 4)[0]
+
+    target = pkg.exports[export_index].serial_offset
+    for k, e in enumerate(pkg.exports):
+        base = export_offset + k * EXPORT_STRIDE
+        if k == export_index:
+            struct.pack_into("<q", out, base + 28, e.serial_size + delta)
+        elif e.serial_offset > target:
+            struct.pack_into("<q", out, base + 36, e.serial_offset + delta)
+
+    for p in s["shift64"]:                       # BulkDataStartOffset
+        v = struct.unpack_from("<q", data, p)[0]
+        if v > 0:
+            struct.pack_into("<q", out, p, v + delta)
+    return bytes(out)

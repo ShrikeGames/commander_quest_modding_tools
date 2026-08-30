@@ -21,10 +21,24 @@ import json, struct
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
-from . import locres, texture, uasset
+from . import locres, payload, texture, uasset, usmap
 from .pak import build_pak
 
 LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
+
+
+def _asset_info(reader, path):
+    """Describe one asset the way the catalog does, for a single path.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        path (str): Pak path without extension.
+
+    Returns:
+        cqmod.catalog.Asset: Its exports and property layout.
+    """
+    from . import catalog
+    return next(a for a in catalog.build_one(reader, path))
 
 
 @dataclass
@@ -104,6 +118,30 @@ class TagEdit:
 
 
 @dataclass
+class AddPropertyEdit:
+    """Give an export a property it does not currently set.
+
+    Unversioned serialization omits defaults, so a unit with no attack has no
+    ``AttackDamage`` entry at all. This is the only edit that changes a
+    payload's length, which is why it is applied before any offset-based edit to
+    the same asset.
+
+    Attributes:
+        asset_path (str): Pak path of the asset, without extension.
+        export_index (int): Zero-based export to add the property to.
+        prop_index (int): Property index to add.
+        value (int): Initial value, written as a 32-bit integer.
+        label (str): Property name, recorded for the build log.
+    """
+
+    asset_path: str
+    export_index: int
+    prop_index: int
+    value: int
+    label: str = ""
+
+
+@dataclass
 class Project:
     """A named collection of staged edits.
 
@@ -119,6 +157,7 @@ class Project:
     textures: list = field(default_factory=list)
     values: list = field(default_factory=list)
     tags: list = field(default_factory=list)
+    added: list = field(default_factory=list)
 
     def save(self, path) -> None:
         """Write the project to JSON.
@@ -132,6 +171,7 @@ class Project:
             "textures": [asdict(t) for t in self.textures],
             "values": [asdict(v) for v in self.values],
             "tags": [asdict(t) for t in self.tags],
+            "added": [asdict(x) for x in self.added],
         }, indent=1))
 
     @classmethod
@@ -151,6 +191,7 @@ class Project:
             textures=[TextureEdit(**x) for x in d.get("textures", [])],
             values=[ValueEdit(**x) for x in d.get("values", [])],
             tags=[TagEdit(**x) for x in d.get("tags", [])],
+            added=[AddPropertyEdit(**x) for x in d.get("added", [])],
         )
 
     @property
@@ -160,7 +201,8 @@ class Project:
         Returns:
             bool: True if there is nothing to build.
         """
-        return not (self.texts or self.textures or self.values or self.tags)
+        return not (self.texts or self.textures or self.values or self.tags
+                    or self.added)
 
     def set_text(self, namespace, key, value, locale="en"):
         """Stage a text change, replacing any existing edit to the same key.
@@ -235,6 +277,24 @@ class Project:
                 return
         self.tags.append(TagEdit(asset_path, offset, tag))
 
+    def add_property(self, asset_path, export_index, prop_index, value, label=""):
+        """Stage adding a property to an export, replacing any existing add.
+
+        Args:
+            asset_path (str): Pak path of the asset, without extension.
+            export_index (int): Zero-based export index.
+            prop_index (int): Property index to add.
+            value (int): Initial value.
+            label (str): Property name, for the build log.
+        """
+        for x in self.added:
+            if (x.asset_path, x.export_index, x.prop_index) == \
+                    (asset_path, export_index, prop_index):
+                x.value, x.label = value, label
+                return
+        self.added.append(
+            AddPropertyEdit(asset_path, export_index, prop_index, value, label))
+
     def clear_asset(self, asset_path):
         """Drop every staged value edit for one asset.
 
@@ -278,10 +338,57 @@ class Project:
         # Value and tag edits both rewrite an asset, so they are applied
         # together: a tag may need a name appended to the header, and the
         # resulting index is then written into the payload.
-        touched = {v.asset_path for v in self.values} | {t.asset_path for t in self.tags}
+        touched = ({v.asset_path for v in self.values}
+                   | {t.asset_path for t in self.tags}
+                   | {x.asset_path for x in self.added})
+        um = None
+        if self.added:
+            um = usmap.Usmap.load()
         for asset in sorted(touched):
             header = reader.read(asset + ".uasset")
-            payload = bytearray(reader.read(asset + ".uexp"))
+            body = reader.read(asset + ".uexp")
+
+            # Adding a property is the only edit that moves later bytes, so it
+            # goes first and every staged offset past the insertion is shifted
+            # to match.
+            shifts = []
+            for x in [y for y in self.added if y.asset_path == asset]:
+                info = _asset_info(reader, asset)
+                before = len(body)
+                cls = info.exports[x.export_index].class_name
+                ptype = next((q["type"] for q in um.properties(cls)
+                              if q["index"] == x.prop_index), None)
+                width = usmap.SERIALIZED_SIZE.get(ptype)
+                if width is None:
+                    raise ValueError(
+                        f"{asset}: cannot add {x.label or x.prop_index}, "
+                        f"{ptype} has no fixed serialized size")
+                raw_value = (struct.pack("<f", float(x.value)) if ptype == "FloatProperty"
+                             else int(x.value).to_bytes(width, "little", signed=True))
+                header, body = payload.add_property(
+                    header, body, info, x.export_index, x.prop_index,
+                    raw_value, um)
+                grew = len(body) - before
+                at = info.exports[x.export_index].start
+                shifts.append((at, grew))
+                say(f"  add    {Path(asset).name} export +{x.export_index + 1} "
+                    f"{x.label or x.prop_index} = {x.value}  (+{grew} bytes)")
+
+            def moved(off):
+                """Where an offset ends up after any insertions.
+
+                Args:
+                    off (int): Offset in the original payload.
+
+                Returns:
+                    int: Offset in the rewritten payload.
+                """
+                for at, grew in shifts:
+                    if off >= at:
+                        off += grew
+                return off
+
+            payload_ba = bytearray(body)
 
             for t in [x for x in self.tags if x.asset_path == asset]:
                 names = uasset.parse(header).names
@@ -291,20 +398,22 @@ class Project:
                     header = uasset.add_name(header, t.tag)
                     index = len(names)
                     say(f"  name   {Path(asset).name} += {t.tag!r} (index {index})")
-                if not (0 <= t.offset <= len(payload) - 4):
-                    raise ValueError(f"{asset}: tag offset {t.offset} outside .uexp")
-                struct.pack_into("<I", payload, t.offset, index)
+                off = moved(t.offset)
+                if not (0 <= off <= len(payload_ba) - 4):
+                    raise ValueError(f"{asset}: tag offset {off} outside .uexp")
+                struct.pack_into("<I", payload_ba, off, index)
                 say(f"  name   {Path(asset).name} @{t.offset} = {t.tag}")
 
             for v in [x for x in self.values if x.asset_path == asset]:
-                if not (0 <= v.offset <= len(payload) - 4):
-                    raise ValueError(f"{asset}: offset {v.offset} outside .uexp "
-                                     f"(0..{len(payload)-4})")
-                struct.pack_into("<i", payload, v.offset, v.value)
+                off = moved(v.offset)
+                if not (0 <= off <= len(payload_ba) - 4):
+                    raise ValueError(f"{asset}: offset {off} outside .uexp "
+                                     f"(0..{len(payload_ba)-4})")
+                struct.pack_into("<i", payload_ba, off, v.value)
                 say(f"  value  {Path(asset).name} @{v.offset} = {v.value}"
                     + (f"  ({v.label})" if v.label else ""))
 
-            files[asset + ".uexp"] = bytes(payload)
+            files[asset + ".uexp"] = bytes(payload_ba)
             files[asset + ".uasset"] = header
 
         from PIL import Image

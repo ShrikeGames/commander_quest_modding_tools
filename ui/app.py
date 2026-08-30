@@ -150,6 +150,14 @@ class MainWindow(QMainWindow):
         self.search.setMaximumWidth(420)
         tb.addWidget(self.search)
         tb.addSeparator()
+        tb.addWidget(QLabel("  Mod name "))
+        self.name_edit = QLineEdit(self.project.name)
+        self.name_edit.setMaximumWidth(200)
+        self.name_edit.setToolTip(
+            "Used for the pak filename, ZZZ_<name>_P.pak, and shown in the Mods tab.")
+        self.name_edit.textChanged.connect(self._name_changed)
+        tb.addWidget(self.name_edit)
+        tb.addSeparator()
         for text, slot in (("Open Project", self.open_project),
                            ("Save Project", self.save_project)):
             a = QAction(text, self); a.triggered.connect(slot); tb.addAction(a)
@@ -805,17 +813,30 @@ class MainWindow(QMainWindow):
         named = bool(self.usmap) and not self.raw_mode.isChecked()
         rows = []
         if named:
-            for e in a.exports:
-                for f in self.usmap.place(e, self._payload):
+            for n, e in enumerate(a.exports):
+                placed = self.usmap.place(e, self._payload)
+                for f in placed:
                     rows.append((e.index, f.name, f.type, f.offset, f.value,
-                                 f.editable, None))
+                                 f.editable, None, None))
                     if self.usmap.is_tag_container(e, f.index):
-                        for n, (off, nidx) in enumerate(
+                        for k, (off, nidx) in enumerate(
                                 self.usmap.tags(f, self._payload)):
                             label = (self._names[nidx] if nidx < len(self._names)
                                      else f"<name {nidx}>")
-                            rows.append((e.index, f"    tag[{n}]", "GameplayTag",
-                                         off, label, False, nidx))
+                            rows.append((e.index, f"    tag[{k}]", "GameplayTag",
+                                         off, label, False, nidx, None))
+                # Properties the export leaves at their default do not appear in
+                # the payload at all, so offer them as additions.
+                if len(placed) == len(e.prop_indices):
+                    have = set(e.prop_indices)
+                    for q in self.usmap.properties(e.class_name):
+                        if q["index"] in have:
+                            continue
+                        if q["type"] not in usmap.SERIALIZED_SIZE:
+                            continue
+                        rows.append((e.index, q["name"], q["type"], -2, None,
+                                     True, None, (n, q["index"])))
+
             if not rows:
                 named = False
         if not named:
@@ -824,7 +845,7 @@ class MainWindow(QMainWindow):
                 end = min(e.end, len(self._payload))
                 for off in range(start, max(start, end - 3)):
                     (v,) = struct.unpack_from("<i", self._payload, off)
-                    rows.append((e.index, e.class_name, "", off, v, True, None))
+                    rows.append((e.index, e.class_name, "", off, v, True, None, None))
 
         if self.usmap is None:
             self.values_hint.setText(
@@ -849,9 +870,9 @@ class MainWindow(QMainWindow):
         staged = {v.offset: v.value for v in self.project.values if v.asset_path == a.path}
         staged_tags = {t.offset: t.tag for t in self.project.tags if t.asset_path == a.path}
         self.values.setRowCount(len(rows))
-        for r, (ei, name, typ, off, val, editable, tag_index) in enumerate(rows):
+        for r, (ei, name, typ, off, val, editable, tag_index, add_spec) in enumerate(rows):
             cells = [f"+{ei}", name, typ,
-                     str(off) if off >= 0 else "zero",
+                     "not set" if off == -2 else ("zero" if off < 0 else str(off)),
                      "" if val is None else str(val)]
             for c, text in enumerate(cells):
                 it = QTableWidgetItem(text)
@@ -877,6 +898,21 @@ class MainWindow(QMainWindow):
                 combo.currentTextChanged.connect(
                     lambda text, o=off, nm=name: self._tag_changed(o, text, nm))
                 self.values.setCellWidget(r, 5, combo)
+                continue
+            if add_spec is not None:
+                pending = next((x for x in self.project.added
+                                if x.asset_path == a.path
+                                and (x.export_index, x.prop_index) == add_spec), None)
+                for c in range(5):
+                    self.values.item(r, c).setForeground(QColor("#7d8a86"))
+                new = QTableWidgetItem("" if pending is None else str(pending.value))
+                new.setData(Qt.UserRole, -2)
+                new.setData(Qt.UserRole + 1, add_spec)
+                new.setToolTip("This export leaves the property at its default. "
+                               "Enter a value to add it.")
+                if pending is not None:
+                    new.setBackground(QColor(ACCENT)); new.setForeground(QColor("white"))
+                self.values.setItem(r, 5, new)
                 continue
             new = QTableWidgetItem("" if off not in staged else str(staged[off]))
             new.setData(Qt.UserRole, off)
@@ -1027,6 +1063,26 @@ class MainWindow(QMainWindow):
             return
         off = item.data(Qt.UserRole)
         text = item.text().strip()
+        spec = item.data(Qt.UserRole + 1)
+        if off == -2 and spec is not None:
+            export_index, prop_index = spec
+            if not text:
+                self.project.added = [
+                    x for x in self.project.added
+                    if not (x.asset_path == self.current.path
+                            and (x.export_index, x.prop_index) == (export_index, prop_index))]
+            else:
+                try:
+                    self.project.add_property(
+                        self.current.path, export_index, prop_index, int(text, 0),
+                        self.values.item(item.row(), 1).text())
+                except ValueError:
+                    QMessageBox.warning(self, "Not a number",
+                                        f"{text!r} is not an integer.")
+                    item.setText("")
+                    return
+            self._refresh_edits()
+            return
         if not text:
             self.project.values = [v for v in self.project.values
                                    if not (v.asset_path == self.current.path and v.offset == off)]
@@ -1051,12 +1107,15 @@ class MainWindow(QMainWindow):
         for t in p.textures:
             src = t.image_path or f"game art: {Path(t.source_texture).name}"
             lines.append(f"art     {Path(t.texture_path).name} <- {src}")
+        for x in p.added:
+            lines.append(f"add     {Path(x.asset_path).name} {x.label} = {x.value}")
         for v in p.values:
             lines.append(f"value   {Path(v.asset_path).name} @{v.offset} = {v.value}")
         for t in p.tags:
             lines.append(f"name    {Path(t.asset_path).name} @{t.offset} = {t.tag}")
         self.edits.setPlainText("\n".join(lines) or "(no edits staged)")
-        n = len(p.texts) + len(p.textures) + len(p.values) + len(p.tags)
+        n = (len(p.texts) + len(p.textures) + len(p.values) + len(p.tags)
+             + len(p.added))
         self.tabs.setTabText(3, f"Pending edits ({n})" if n else "Pending edits")
 
     def _clear_edits(self):
@@ -1068,12 +1127,23 @@ class MainWindow(QMainWindow):
             self._select_asset()
 
     # ---------------------------------------------------------- project
+    def _name_changed(self, text):
+        """Rename the mod being built.
+
+        Args:
+            text (str): New name. Characters that cannot appear in a filename
+                are replaced, since the name becomes the pak's filename.
+        """
+        clean = "".join(c if c.isalnum() or c in "-_" else "_" for c in text).strip("_")
+        self.project.name = clean or "MyMod"
+
     def open_project(self):
         """Load a project file, replacing the staged edits.
         """
         p, _ = QFileDialog.getOpenFileName(self, "Open project", "", "JSON (*.json)")
         if p:
             self.project = Project.load(p); self.project_path = Path(p)
+            self.name_edit.setText(self.project.name)
             self._refresh_edits()
             if self.current:
                 self._select_asset()

@@ -51,8 +51,8 @@ The payload length never changes, since only a four-byte index is rewritten.
 
 The deck size is fixed. Slots can be repointed but not added or removed, because
 that would change the array's length and therefore the export's `SerialSize`.
-Giving a commander an eleventh card needs the same payload-resizing work that
-adding a tag to a unit without one does.
+Giving a commander an eleventh card needs array resizing, which is a step beyond
+the single-property insertion in [adding properties](adding-properties.md).
 
 Only the two starting decks are here. Cards acquired during a run come from
 shops and events, which are separate systems.

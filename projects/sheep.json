@@ -1,0 +1,110 @@
+{
+ "name": "MyMod",
+ "texts": [],
+ "textures": [],
+ "values": [
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Sheep",
+   "offset": 71,
+   "value": 1,
+   "label": "DA_Unit_Sheep@71"
+  }
+ ],
+ "tags": [
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 243,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 257,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 271,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 285,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 299,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 313,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 341,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 355,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 369,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 530,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 544,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 558,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 572,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 586,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 600,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 614,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 628,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 642,
+   "tag": "Summon_Sheep"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Commanders/DA_Commander_Richard",
+   "offset": 656,
+   "tag": "Summon_Sheep"
+  }
+ ]
+}

@@ -345,6 +345,54 @@ def main():
         check("most summon cards resolve their unit", linked > len(summons) * 0.8,
               f"{linked}/{len(summons)}")
 
+    print("\nadding properties:")
+    rebuilt_ok = rebuilt_bad = 0
+    for x in assets:
+        px = r.read(x.uexp)
+        for e in x.exports:
+            if not e.prop_indices or e.header_bytes == 0:
+                continue
+            if px[e.start:e.start + e.header_bytes] == \
+                    unversioned.build(e.prop_indices, e.zero_indices):
+                rebuilt_ok += 1
+            else:
+                rebuilt_bad += 1
+    check("property headers rebuild byte-identically", rebuilt_bad == 0,
+          f"{rebuilt_ok} exports")
+
+    sheep = by.get("DA_Unit_Sheep")
+    if sheep and um:
+        atk = next((k for k, e in enumerate(sheep.exports)
+                    if e.class_name.startswith("CMUnitAttackType")), None)
+        hp_export = next((e for e in sheep.exports if e.class_name == "CMUnitData"), None)
+        sp = r.read(sheep.uexp)
+        hp = next((f for f in um.place(hp_export, sp) if f.name == "MaxHealth"), None)
+        check("the sheep has an attack export but no AttackDamage",
+              atk is not None and 6 not in sheep.exports[atk].prop_indices)
+
+        proj4 = Project(name="SheepCheck")
+        proj4.add_property(sheep.path, atk, 6, 9, "AttackDamage")
+        if hp:
+            # An offset after the insertion, to prove staged edits are shifted.
+            proj4.set_value(sheep.path, hp.offset, 25, "MaxHealth")
+        raw4 = proj4.build(r)
+        with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f4:
+            f4.write(raw4); tmp4 = f4.name
+        m4 = PakReader(tmp4)
+        got = catalog.build_one(m4, sheep.path)[0]
+        pay4 = m4.read(sheep.uexp)
+        vals = {f.name: f.value for e in got.exports for f in um.place(e, pay4)}
+        check("a missing property can be added", vals.get("AttackDamage") == 9,
+              str(vals.get("AttackDamage")))
+        check("edits after the insertion are shifted to match",
+              vals.get("MaxHealth") == 25, str(vals.get("MaxHealth")))
+        check("the payload grew by exactly the value size",
+              len(pay4) == len(sp) + 4, f"{len(sp)} -> {len(pay4)}")
+        total4 = sum(e.end - e.start for e in got.exports)
+        check("exports still tile the payload after insertion",
+              total4 == len(pay4) - 4, f"{total4} vs {len(pay4) - 4}")
+        m4.close(); Path(tmp4).unlink()
+
     print("\nstarting decks:")
     rows = decks.card_rows(r)
     check("the card table's row names are readable", len(rows) > 200, f"{len(rows)} rows")
