@@ -108,11 +108,25 @@ DA_Unit_Human_GrowingSquire    AttackDamage 3    MaxHealth 7
 Both match the collection screen exactly, and the self-test asserts it. Select
 the unit asset rather than the card to edit them.
 
-Reaching `MaxHealth` needs one extra step. It sits at index 1, right after
-`Tags`, a `StructProperty` whose size no type table can give. Seeding each
-class's size equations with the sizes the types already provide leaves many
-equations with a single unknown, which determines it: `CMUnitData::Tags` is 12
-bytes. That resolves 206 further properties across the game.
+Reaching `MaxHealth` needs one extra step, because it sits at index 1 right
+after `Tags`, a `StructProperty` whose size no type table can give.
+
+Solving a fixed size for it would be wrong: `Tags` is a gameplay tag container
+and its length depends on how many tags a unit has, 12 bytes for one and 20 for
+two. An early version derived 12, applied it everywhere, and silently shifted
+every later property, which is how `DA_Unit_Human_Archer` came to report a
+`MaxHealth` of 0. It was reading the tail of `Tags`.
+
+Placement is therefore **validated against the payload length**. Container
+properties serialize as a count followed by elements, so their count is read and
+the plausible element widths tried; a layout is only accepted if it consumes the
+value region exactly, to the byte. Anything that does not add up falls back to
+placing only the prefix that is certain, rather than reporting offsets that
+might be wrong.
+
+All 325 unit assets now place completely, and the recovered stats match the
+collection screen for every card checked: Militia 2/4, Ambush Cavalry 3/8,
+Assassin 6/2, Cataphract 4/13, Budding Squire 3/7.
 
 ## What is still not named
 

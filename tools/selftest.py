@@ -176,12 +176,34 @@ def main():
                 continue
             pl2 = r.read(u.uexp)
             stats[nm] = {f.name: f.value for e in u.exports for f in um.place(e, pl2)}
+        placed_all = 0
+        units = [x for x in assets if x.class_name == "CMUnitData"]
+        for u in units:
+            pl3 = r.read(u.uexp)
+            ex = next(x for x in u.exports if x.class_name == "CMUnitData")
+            if len(um.place(ex, pl3)) == len(ex.prop_indices):
+                placed_all += 1
+        check("every unit asset places completely", placed_all == len(units),
+              f"{placed_all}/{len(units)}")
+
         check("unit stats match the values shown in game",
               stats.get("DA_Unit_Human_Cataphract", {}).get("MaxHealth") == 13
               and stats.get("DA_Unit_Human_Cataphract", {}).get("AttackDamage") == 4
               and stats.get("DA_Unit_Human_GrowingSquire", {}).get("MaxHealth") == 7
               and stats.get("DA_Unit_Human_GrowingSquire", {}).get("AttackDamage") == 3,
               "Cataphract 13/4, Squire 7/3")
+        cross = {}
+        for nm in ("DA_Unit_Neutral_Militia", "DA_Unit_Neutral_AmbushCavalry",
+                   "DA_Unit_Human_Assassin"):
+            u = by.get(nm)
+            if u:
+                pl4 = r.read(u.uexp)
+                cross[nm] = {f.name: f.value for e in u.exports for f in um.place(e, pl4)}
+        check("more unit stats match the collection screen",
+              cross.get("DA_Unit_Neutral_Militia", {}).get("MaxHealth") == 4
+              and cross.get("DA_Unit_Neutral_AmbushCavalry", {}).get("MaxHealth") == 8
+              and cross.get("DA_Unit_Human_Assassin", {}).get("AttackDamage") == 6,
+              "Militia hp4, Cavalry hp8, Assassin atk6")
 
     print("\nproperty schema:")
     layouts = schema.build(r, assets)

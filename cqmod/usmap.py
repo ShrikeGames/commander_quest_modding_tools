@@ -26,6 +26,9 @@ from . import ftext
 
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "schema" / "usmap.json"
 
+EXPORT_TRAILER = 4
+"""Every export payload ends with four bytes terminating the property list."""
+
 SERIALIZED_SIZE = {
     "BoolProperty": 1,
     "EnumProperty": 1,
@@ -175,7 +178,10 @@ class Usmap:
             for p in self.properties(cls):
                 if p["type"] in SERIALIZED_SIZE:
                     known[(cls, p["index"])] = SERIALIZED_SIZE[p["type"]]
+        seeded_keys = set(known)
         seeded = len(known)
+        poisoned = set()
+        """Properties proven to vary between assets; never given a fixed size."""
 
         changed = True
         while changed:
@@ -191,8 +197,21 @@ class Usmap:
                     unknown = [i for i in idxs if (cls, i) not in known]
                     rest = total - sum(known[(cls, i)] for i in idxs if (cls, i) in known)
                     if len(unknown) == 1 and rest >= 0:
-                        known[(cls, unknown[0])] = rest
-                        changed = True
+                        k = (cls, unknown[0])
+                        if k not in poisoned:
+                            known[k] = rest
+                            changed = True
+                    elif not unknown and rest != 0:
+                        # These sizes cannot all be right, so something in this
+                        # set varies between assets. Drop the derived ones and
+                        # poison them, otherwise propagation re-derives the same
+                        # wrong value forever.
+                        for i in idxs:
+                            k = (cls, i)
+                            if k in known and k not in seeded_keys:
+                                del known[k]
+                                poisoned.add(k)
+                                changed = True
         self.sizes = known
         return len(known) - seeded
 
@@ -216,32 +235,94 @@ class Usmap:
         props = {p["index"]: p for p in self.properties(export.class_name)}
         if not props:
             return []
-        start = export.start + export.header_bytes
-        texts = {t.offset + start: t.end + start
-                 for t in ftext.find_all(payload[start:export.end], [""] * 65536)}
+        vstart = export.start + export.header_bytes
+        vend = export.end - EXPORT_TRAILER
+        spans = ftext.find_all(payload[vstart:export.end], [""] * 65536)
+        text_at = {t.offset + vstart: t.end + vstart for t in spans}
         zero = set(export.zero_indices)
-        out = []
-        cursor = start
-        for idx in export.prop_indices:
-            p = props.get(idx)
-            if p is None:
-                break
+        order = [i for i in export.prop_indices if i in props]
+
+        def candidates(idx, cursor):
+            """Possible byte sizes for a property at a given position.
+
+            A known type or a solved size gives exactly one answer. Otherwise
+            the property is a container, which serializes as a count followed by
+            its elements, so the count is read and the plausible element widths
+            offered as alternatives. The search below keeps only whichever
+            choice makes the whole payload add up.
+
+            Args:
+                idx (int): Property index.
+                cursor (int): Where the property starts.
+
+            Returns:
+                list[int]: Candidate sizes, most likely first.
+            """
+            if cursor in text_at:
+                return [text_at[cursor] - cursor]
+            t = props[idx]["type"]
+            if t in SERIALIZED_SIZE:
+                return [SERIALIZED_SIZE[t]]
+            fixed = self.sizes.get((export.class_name, idx))
+            if fixed is not None:
+                return [fixed]
+            if cursor + 4 > len(payload):
+                return []
+            n = struct.unpack_from("<i", payload, cursor)[0]
+            if not 0 <= n <= 4096:
+                return []
+            return [4 + n * w for w in (8, 4, 16, 1, 12, 32)]
+
+        def search(i, cursor, acc):
+            """Find a layout that consumes the value region exactly.
+
+            Args:
+                i (int): Position in ``order``.
+                cursor (int): Current byte offset.
+                acc (list): Placements chosen so far.
+
+            Returns:
+                list | None: A complete layout, or None if this branch fails.
+            """
+            if i == len(order):
+                return acc if cursor == vend else None
+            idx = order[i]
             if idx in zero:
-                out.append(Field(idx, p["name"], p["type"], p["owner"], -1, 0, 0))
-                continue
-            if cursor in texts:
-                size = texts[cursor] - cursor
-            elif p["type"] in SERIALIZED_SIZE:
-                size = SERIALIZED_SIZE[p["type"]]
-            elif (export.class_name, idx) in self.sizes:
-                size = self.sizes[(export.class_name, idx)]
-            else:
-                break
+                return search(i + 1, cursor, acc + [(idx, -1, 0)])
+            for size in candidates(idx, cursor):
+                if size < 0 or cursor + size > vend:
+                    continue
+                got = search(i + 1, cursor + size, acc + [(idx, cursor, size)])
+                if got is not None:
+                    return got
+            return None
+
+        layout = search(0, vstart, [])
+        if layout is None:
+            # No arrangement accounts for every byte, so place only the prefix
+            # that is certain rather than reporting positions that may be wrong.
+            layout = []
+            cursor = vstart
+            for idx in order:
+                if idx in zero:
+                    layout.append((idx, -1, 0))
+                    continue
+                c = candidates(idx, cursor)
+                if len(c) != 1 or cursor + c[0] > vend:
+                    break
+                layout.append((idx, cursor, c[0]))
+                cursor += c[0]
+
+        out = []
+        for idx, off, size in layout:
+            p = props[idx]
             value = None
-            if size == 4 and p["type"] in ("IntProperty", "ObjectProperty", "ClassProperty"):
-                value = struct.unpack_from("<i", payload, cursor)[0]
-            elif size == 1:
-                value = payload[cursor]
-            out.append(Field(idx, p["name"], p["type"], p["owner"], cursor, size, value))
-            cursor += size
+            if off >= 0 and size == 4 and p["type"] in (
+                    "IntProperty", "ObjectProperty", "ClassProperty"):
+                value = struct.unpack_from("<i", payload, off)[0]
+            elif off >= 0 and size == 1:
+                value = payload[off]
+            elif off < 0:
+                value = 0
+            out.append(Field(idx, p["name"], p["type"], p["owner"], off, size, value))
         return out
