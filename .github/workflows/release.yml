@@ -141,12 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      # The full history and the tag objects are needed, because the release
-      # notes are the annotated tag's own message.
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
 
       - uses: actions/download-artifact@v4
         with:
@@ -155,15 +150,34 @@ jobs:
 
       # Writing the notes into the tag keeps them with the commit they describe,
       # rather than in a box that only exists on the release page.
+      #
+      # The message is read through the API rather than from the checkout.
+      # actions/checkout creates a lightweight tag pointing at the commit, so
+      # git's own %(contents) yields the commit message instead of the
+      # annotation, which is a silent wrong answer rather than an error.
       - name: Take the release notes from the tag
         id: notes
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" \
+                  --jq 'select(.object.type == "tag") | .object.sha' || true)
+          if [ -n "$sha" ]; then
+            # Drop the subject line: GitHub already titles the release with it.
+            gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.message' \
+              | tail -n +2 | sed '/./,$!d' > notes.md
+          else
+            echo "tag $GITHUB_REF_NAME is not annotated; no notes" >&2
+            : > notes.md
+          fi
           {
             echo "text<<CQMOD_NOTES_EOF"
-            git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME"
+            cat notes.md
             echo "CQMOD_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish
         uses: softprops/action-gh-release@v2
