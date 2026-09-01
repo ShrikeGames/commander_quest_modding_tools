@@ -535,7 +535,8 @@ def add_import(data: bytes, class_package: str, class_name: str,
 
 
 def add_asset_reference(data: bytes, game_path: str, class_name: str,
-                        class_package: str = "/Script/Engine"):
+                        class_package: str = "/Script/Engine",
+                        object_name: str = None):
     """Make a package able to refer to an asset it does not currently import.
 
     Two entries are needed: one for the package that holds the object, and one
@@ -549,12 +550,17 @@ def add_asset_reference(data: bytes, game_path: str, class_name: str,
             ``/Game/UI/ArtResources/Card/Human/T_Image_Card_X``.
         class_name (str): Class of the target, e.g. ``Texture2D``.
         class_package (str): Package declaring that class.
+        object_name (str | None): Name of the object inside that package.
+            Defaults to the last segment of the path, which is right for most
+            assets. A generated class does not follow that rule: the animation
+            blueprint in ``/Game/.../ABP_Human_Assassin`` holds a class object
+            named ``ABP_Human_Assassin_C``.
 
     Returns:
         tuple[bytes, int]: The rebuilt ``.uasset`` and the object's
         ``FPackageIndex``.
     """
-    object_name = game_path.rsplit("/", 1)[-1]
+    object_name = object_name or game_path.rsplit("/", 1)[-1]
     pkg = parse(data)
     existing = None
     for i, imp in enumerate(pkg.imports):

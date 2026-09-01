@@ -96,6 +96,12 @@ CATEGORIES = [
     Category("unit_tags", "Unit tags",
              "Shuffles gameplay tags between the units that carry them.",
              (SHUFFLE,)),
+    Category("unit_models", "Unit models",
+             "Swaps what units look like on the battlefield. A unit's mesh, "
+             "its animation and its materials move together, so a swapped "
+             "unit still animates and is textured as the creature it now "
+             "looks like.",
+             (SHUFFLE,)),
     Category("quest_rarity", "Quest rarity",
              "Shuffles how rare each quest is, which changes how often it is "
              "offered.",
@@ -399,6 +405,11 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
         summary["unit_tags"] = _shuffle_tags(
             reader, um, _rng(settings, "unit_tags"), units, project)
 
+    mode = settings.mode("unit_models")
+    if mode != OFF:
+        summary["unit_models"] = _shuffle_models(
+            reader, _rng(settings, "unit_models"), project)
+
     quests = sorted((a for a in assets if a.class_name == QUEST_CLASS),
                     key=lambda a: a.name)
     events = sorted((a for a in assets if a.class_name == EVENT_CLASS),
@@ -440,6 +451,19 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
             _collect(reader, um, events, "GearRarity"), settings)
 
     return summary
+
+
+UNIT_BLUEPRINT_DIR = "Commander/Content/Data/Units/"
+"""Where the unit actor blueprints live, one per summonable unit."""
+
+VISUAL_CLASSES = ("SkeletalMesh", "AnimBlueprintGeneratedClass",
+                  "MaterialInstanceConstant")
+"""The imports that together make up a unit's appearance.
+
+``CMUnitData`` holds a unit's rules but nothing about how it looks. The model
+sits on the ``BP_Unit_*`` actor instead, as a skeletal mesh, the animation
+blueprint that drives it and the material overrides its component carries.
+"""
 
 
 QUEST_CLASS = "CMQuestDefinition"
@@ -663,6 +687,149 @@ def _shuffle_rewards(reader, rng, quests, project):
             if row == old:
                 continue
             project.set_name_ref(a.path, off, row)
+            n += 1
+    return n
+
+
+@dataclass
+class UnitVisual:
+    """Everything that makes one unit look the way it does.
+
+    Attributes:
+        path (str): Pak path of the ``BP_Unit_*`` blueprint, without extension.
+        name (str): The blueprint's file name.
+        mesh (tuple): ``(package path, object name, [offsets])`` of its
+            skeletal mesh.
+        anim (tuple | None): The same for its animation blueprint class, or
+            None for a unit that does not animate.
+        materials (list): One such tuple per material override, in slot order.
+    """
+
+    path: str
+    name: str
+    mesh: tuple
+    anim: tuple
+    materials: list
+
+
+def _import_refs(pkg, body, class_name):
+    """Find each import of one class and where the payload points at it.
+
+    Args:
+        pkg (cqmod.uasset.Package): The parsed header.
+        body (bytes): Its ``.uexp``.
+        class_name (str): Import class to look for.
+
+    Returns:
+        list[tuple]: ``(package path, object name, [offsets])`` per import that
+        the payload actually references, ordered by first use. A mesh is
+        referenced twice, once as the component's deprecated ``SkeletalMesh``
+        and once as the ``SkinnedAsset`` that replaced it, and both have to
+        move together.
+    """
+    out = []
+    for i, imp in enumerate(pkg.imports):
+        if imp.class_name != class_name:
+            continue
+        index = -(i + 1)
+        offsets = [o for o in range(len(body) - 4)
+                   if struct.unpack_from("<i", body, o)[0] == index]
+        if not offsets:
+            continue
+        package = pkg.resolve(imp.outer_index)
+        if isinstance(package, str) and package.startswith("/Game/"):
+            out.append((package, imp.object_name, offsets))
+    return sorted(out, key=lambda x: x[2][0])
+
+
+def unit_visuals(reader):
+    """Read the appearance of every unit blueprint in the game.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+
+    Returns:
+        list[UnitVisual]: One entry per blueprint whose model can be swapped.
+        Blueprints with no skeletal mesh, such as a plain barricade, are left
+        out because there is nothing to exchange.
+    """
+    out = []
+    for path in sorted(f for f in reader.files()
+                       if f.startswith(UNIT_BLUEPRINT_DIR)
+                       and f.endswith(".uasset")):
+        base = path[:-len(".uasset")]
+        try:
+            pkg = uasset.parse(reader.read(path))
+            body = reader.read(base + ".uexp")
+        except Exception:
+            continue
+        mesh = _import_refs(pkg, body, "SkeletalMesh")
+        # Two meshes on one actor means a mount or a crew, and there is no way
+        # to tell which is the body, so those are skipped rather than guessed.
+        if len(mesh) != 1:
+            continue
+        anim = _import_refs(pkg, body, "AnimBlueprintGeneratedClass")
+        out.append(UnitVisual(base, Path(base).name, mesh[0],
+                              anim[0] if len(anim) == 1 else None,
+                              _import_refs(pkg, body,
+                                           "MaterialInstanceConstant")))
+    return out
+
+
+def _shuffle_models(reader, rng, project):
+    """Swap unit models between units, keeping each one coherent.
+
+    A model is not swappable on its own. The animation blueprint is built
+    against a particular skeleton, and the material overrides on the component
+    are written for a particular mesh's slots, so moving the mesh alone would
+    leave a unit animating against the wrong skeleton and wearing another
+    creature's textures. The mesh, its animation and its materials therefore
+    move together as one package, which also means the two do not have to share
+    a skeleton: the donor's animation comes with the donor's body.
+
+    Units are pooled by how many material overrides they carry so that every
+    slot receives a material. A unit with three slots cannot take the
+    appearance of one with two without leaving a slot pointing at its old
+    material, which is the wrong-textures case again.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        rng (random.Random): Generator for this category.
+        project (cqmod.project.Project): Project to add edits to.
+
+    Returns:
+        int: How many units were given a new appearance.
+    """
+    # Commanders take part whatever the include-commanders setting says. That
+    # guard is there to stop a commander being rolled down to a few health and
+    # making a run unwinnable, and an appearance changes no numbers. Card art
+    # treats commanders the same way.
+    visuals = unit_visuals(reader)
+
+    pools = {}
+    for v in visuals:
+        pools.setdefault((len(v.materials), v.anim is not None), []).append(v)
+
+    n = 0
+    for key in sorted(pools):
+        pool = pools[key]
+        if len(pool) < 2:
+            continue
+        donors = list(pool)
+        rng.shuffle(donors)
+        for target, donor in zip(pool, donors):
+            if donor.path == target.path:
+                continue
+            moves = [(target.mesh, donor.mesh, "SkeletalMesh")]
+            if target.anim and donor.anim:
+                moves.append((target.anim, donor.anim,
+                              "AnimBlueprintGeneratedClass"))
+            moves += [(a, b, "MaterialInstanceConstant")
+                      for a, b in zip(target.materials, donor.materials)]
+            for (_, _, offsets), (package, obj, _), class_name in moves:
+                for off in offsets:
+                    project.set_reference(target.path, off, package,
+                                          class_name, class_name, obj)
             n += 1
     return n
 

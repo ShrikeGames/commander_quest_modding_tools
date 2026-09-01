@@ -42,6 +42,7 @@ should be less reasonable.
 | Commander starting decks | random | ten cards drawn from the whole pool |
 | Unit tags | shuffle | gameplay tags redistributed between units that have them |
 | Card art | shuffle | cosmetic, and likewise repointed rather than copied |
+| Unit models | shuffle | what units look like in battle, mesh and animation together |
 | Quest rarity | shuffle | `QuestRarity`, which changes how often a quest is offered |
 | Quest requirements | shuffle, random | how much a quest asks of you, pooled by kind |
 | Quest rewards | shuffle | which card, relic or consumable a quest hands out |
@@ -52,6 +53,45 @@ should be less reasonable.
 Relics are `CMGearDefinition` in the data. Their effects are separate exports
 just as cards' are, so the same numeric knobs are reachable: 151 relics carry
 `ResourceAmount`, `TriggerCount`, `BuffValue`, `HpAmmount` and similar.
+
+## Unit models
+
+`CMUnitData` holds a unit's rules and says nothing about how it looks. The model
+lives on the `BP_Unit_*` actor in `Data/Units`, 234 blueprints, as three things
+that only make sense together:
+
+- a **skeletal mesh**, referenced twice: once as the component's deprecated
+  `SkeletalMesh` and once as the `SkinnedAsset` that replaced it in UE5
+- an **animation blueprint class**, built against that mesh's skeleton
+- the **material overrides** the component carries, written for that mesh's slots
+
+Swapping the mesh on its own would leave a unit animating against the wrong
+skeleton and wearing another creature's textures. All three therefore move
+together as one package, which has a useful consequence: the two units do not
+need to share a skeleton, because the donor's animation arrives with the
+donor's body. Meshes do group by skeleton, 48 on `Human_Skeleton` and 41 on
+`Dwarf_Skeleton` with a long tail of one-offs, and restricting swaps to a
+shared skeleton would have limited them to that grouping for no gain.
+
+Units are pooled by how many material overrides they carry, so every slot
+receives a material. A unit with three slots taking the appearance of one with
+two would leave the third pointing at its old material, which is the
+wrong-textures case again. That yields 222 swappable units, and a run reskins
+around 208 of them: a permutation leaves a fixed point or two per pool, and one
+unit is the only member of its pool.
+
+Commanders take part regardless of the **Include commanders** setting. That
+guard exists to stop a commander being rolled down to a few health and making a
+run unwinnable, and an appearance changes no numbers. Card art treats
+commanders the same way.
+
+This category is what import insertion was for. A blueprint imports only the
+mesh it already uses, so before `uasset.add_import` existed there was no way to
+aim it at another unit's model at all. It also needed one addition: a generated
+class is not named after its package, so the animation blueprint at
+`/Game/ArtAssets/Animation/Human/ABP_Human_Assassin` holds a class object called
+`ABP_Human_Assassin_C`, and `add_asset_reference` grew an explicit object name
+for that case.
 
 ## Quests and events
 

@@ -20,7 +20,7 @@ loads at startup.
 | **Edit decks** | Change the cards a commander starts with |
 | **Find fields** | Diff a card against its `+` upgrade variant to locate gameplay numbers |
 | **Build** | Compile staged edits into `ZZZ_<name>_P.pak` and install it |
-| **Randomize** | Generate a seeded randomized run from a checklist of categories |
+| **Randomize** | Generate a seeded randomized run from a checklist of 20 categories, including unit models, quests and events |
 | **Manage mods** | List installed mods and enable or disable each one |
 
 Asset classes indexed include `CMCardData_*` (666 cards), `CMUnitData` (325 units),

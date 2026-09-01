@@ -634,6 +634,70 @@ def main():
     check("rewards keyed in Korean survive the round trip", len(wide) > 0,
           f"{len(wide)} non-ASCII rows")
 
+    print("\nunit models:")
+    visuals = randomizer.unit_visuals(r)
+    check("unit blueprints yield swappable appearances",
+          len(visuals) > 200, f"{len(visuals)} of 234 blueprints")
+    check("a mesh is referenced twice, as SkeletalMesh and SkinnedAsset",
+          all(len(v.mesh[2]) >= 2 for v in visuals),
+          f"{sum(1 for v in visuals if len(v.mesh[2]) < 2)} with fewer")
+    check("every appearance resolves to a /Game package",
+          all(v.mesh[0].startswith("/Game/") for v in visuals))
+
+    rp8 = Project(name="Models")
+    sm8 = randomizer.run(r, assets, um,
+                         randomizer.Settings(seed=5,
+                                             choices={"unit_models": "shuffle"}),
+                         rp8)
+    check("model shuffling reskins most units", sm8["unit_models"] > 180,
+          f"{sm8['unit_models']} of {len(visuals)}")
+    check("model edits touch only unit blueprints",
+          all(x.asset_path.startswith(randomizer.UNIT_BLUEPRINT_DIR)
+              for x in rp8.references))
+
+    # An appearance is only coherent as a package. The animation blueprint is
+    # built against one skeleton and the material overrides are written for one
+    # mesh's slots, so a unit must take all three from the same donor or it
+    # animates against the wrong skeleton wearing another creature's textures.
+    by_path = {v.path: v for v in visuals}
+    real = {(v.mesh[1], v.anim[1] if v.anim else None,
+             tuple(x[1] for x in v.materials)) for v in visuals}
+    staged = {}
+    for x in rp8.references:
+        staged.setdefault(x.asset_path, {})[x.offset] = x.object_name
+    coherent = 0
+    for path, edits in staged.items():
+        v = by_path[path]
+        mesh = edits.get(v.mesh[2][0], v.mesh[1])
+        anim = edits.get(v.anim[2][0], v.anim[1]) if v.anim else None
+        mats = tuple(edits.get(x[2][0], x[1]) for x in v.materials)
+        coherent += (mesh, anim, mats) in real
+    check("a reskinned unit wears one donor's whole appearance",
+          coherent == len(staged), f"{coherent}/{len(staged)}")
+
+    with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f8:
+        f8.write(rp8.build(r)); tmp8 = f8.name
+    m8 = PakReader(tmp8)
+    landed = 0
+    for x in rp8.references:
+        pk8 = uasset.parse(m8.read(x.asset_path + ".uasset"))
+        index = struct.unpack_from(
+            "<i", m8.read(x.asset_path + ".uexp"), x.offset)[0]
+        landed += pk8.resolve(index) == x.object_name
+    m8.close(); Path(tmp8).unlink()
+    check("every model reference resolves to its new object",
+          landed == len(rp8.references), f"{landed}/{len(rp8.references)}")
+
+    # A generated class is not named after its package: the animation blueprint
+    # in /Game/.../ABP_Human_Assassin holds a class called ABP_Human_Assassin_C.
+    probe8 = r.read(next(f for f in r.files()
+                         if f.endswith("BP_Unit_Assassin.uasset")))
+    grown8, index8 = uasset.add_asset_reference(
+        probe8, "/Game/SelfTest/ABP_Probe", "AnimBlueprintGeneratedClass",
+        object_name="ABP_Probe_C")
+    check("a reference can name an object its package does not",
+          uasset.parse(grown8).resolve(index8) == "ABP_Probe_C")
+
     print("\nstarting decks:")
     rows = decks.card_rows(r)
     check("the card table's row names are readable", len(rows) > 200, f"{len(rows)} rows")

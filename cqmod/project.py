@@ -188,6 +188,8 @@ class ReferenceEdit:
         target (str): Engine path of the new target, e.g. ``/Game/UI/...``.
         class_name (str): Class of the target, e.g. ``Texture2D``.
         label (str): Property name, for the build log.
+        object_name (str): Name of the object inside the target package, when
+            it is not the package's own last segment.
     """
 
     asset_path: str
@@ -195,6 +197,7 @@ class ReferenceEdit:
     target: str
     class_name: str = "Texture2D"
     label: str = ""
+    object_name: str = ""
 
 
 @dataclass
@@ -356,7 +359,7 @@ class Project:
             AddPropertyEdit(asset_path, export_index, prop_index, value, label))
 
     def set_reference(self, asset_path, offset, target, class_name="Texture2D",
-                      label=""):
+                      label="", object_name=""):
         """Stage repointing an object reference, replacing any edit at the offset.
 
         Args:
@@ -365,13 +368,16 @@ class Project:
             target (str): Engine path of the new target.
             class_name (str): Class of the target.
             label (str): Property name, for the build log.
+            object_name (str): Object name inside the target package, when it
+                differs from the package's last segment.
         """
         for x in self.references:
             if (x.asset_path, x.offset) == (asset_path, offset):
-                x.target, x.class_name, x.label = target, class_name, label
+                (x.target, x.class_name, x.label,
+                 x.object_name) = target, class_name, label, object_name
                 return
-        self.references.append(
-            ReferenceEdit(asset_path, offset, target, class_name, label))
+        self.references.append(ReferenceEdit(asset_path, offset, target,
+                                             class_name, label, object_name))
 
     def clear_asset(self, asset_path):
         """Drop every staged value edit for one asset.
@@ -486,13 +492,14 @@ class Project:
             widths = _value_widths(reader, asset, bytes(payload_ba)) if self.values else {}
             for x in [y for y in self.references if y.asset_path == asset]:
                 header, index = uasset.add_asset_reference(
-                    header, x.target, x.class_name)
+                    header, x.target, x.class_name,
+                    object_name=x.object_name or None)
                 off = moved(x.offset)
                 if not (0 <= off <= len(payload_ba) - 4):
                     raise ValueError(f"{asset}: reference offset {off} outside .uexp")
                 struct.pack_into("<i", payload_ba, off, index)
                 say(f"  ref    {Path(asset).name} {x.label or off} -> "
-                    f"{x.target.rsplit('/', 1)[-1]}")
+                    f"{x.object_name or x.target.rsplit('/', 1)[-1]}")
 
             for v in [x for x in self.values if x.asset_path == asset]:
                 off = moved(v.offset)
