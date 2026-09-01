@@ -26,7 +26,7 @@ import struct
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import decks
+from . import decks, uasset
 
 SHUFFLE = "shuffle"
 RANDOM = "random"
@@ -95,6 +95,31 @@ CATEGORIES = [
              (RANDOM,)),
     Category("unit_tags", "Unit tags",
              "Shuffles gameplay tags between the units that carry them.",
+             (SHUFFLE,)),
+    Category("quest_rarity", "Quest rarity",
+             "Shuffles how rare each quest is, which changes how often it is "
+             "offered.",
+             (SHUFFLE,)),
+    Category("quest_conditions", "Quest requirements",
+             "Changes how much a quest asks of you, such as how many cards to "
+             "play or how much of a resource to spend. Each requirement stays "
+             "in the pool of its own kind, so a count that was small stays "
+             "small and one measured in hundreds stays large."),
+    Category("quest_rewards", "Quest rewards",
+             "Shuffles which card, relic or consumable each quest hands out. "
+             "Rewards stay within their kind, so a quest that gave a relic "
+             "still gives a relic.",
+             (SHUFFLE,)),
+    Category("event_values", "Event numbers",
+             "Rerolls the amounts events give and take: gold, cards, relics "
+             "and consumables. Grouped by what is being counted, so a gold "
+             "payout is not swapped with a card count."),
+    Category("event_health", "Event health effects",
+             "Changes what events do to your commander's health. These are "
+             "ratios rather than counts, and some are negative, so a shrine "
+             "that healed you may end up costing you instead."),
+    Category("event_gear_rarity", "Event relic rarity",
+             "Shuffles the rarity of relic an event awards.",
              (SHUFFLE,)),
 ]
 
@@ -374,7 +399,272 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
         summary["unit_tags"] = _shuffle_tags(
             reader, um, _rng(settings, "unit_tags"), units, project)
 
+    quests = sorted((a for a in assets if a.class_name == QUEST_CLASS),
+                    key=lambda a: a.name)
+    events = sorted((a for a in assets if a.class_name == EVENT_CLASS),
+                    key=lambda a: a.name)
+
+    mode = settings.mode("quest_rarity")
+    if mode != OFF:
+        summary["quest_rarity"] = _apply(
+            project, _rng(settings, "quest_rarity"), SHUFFLE,
+            _collect(reader, um, quests, "QuestRarity"), settings)
+
+    mode = settings.mode("quest_conditions")
+    if mode != OFF:
+        summary["quest_conditions"] = _apply_groups(
+            project, _rng(settings, "quest_conditions"), mode,
+            _quantities(reader, um, quests, "QuestCompleteCondition"), settings)
+
+    mode = settings.mode("quest_rewards")
+    if mode != OFF:
+        summary["quest_rewards"] = _shuffle_rewards(
+            reader, _rng(settings, "quest_rewards"), quests, project)
+
+    mode = settings.mode("event_values")
+    if mode != OFF:
+        summary["event_values"] = _apply_groups(
+            project, _rng(settings, "event_values"), mode,
+            _quantities(reader, um, events, "CMEventActionParameter"), settings)
+
+    mode = settings.mode("event_health")
+    if mode != OFF:
+        summary["event_health"] = _apply_floats(
+            project, _rng(settings, "event_health"), mode,
+            _floats(reader, um, events, "CMEventActionParameter"), settings)
+
+    mode = settings.mode("event_gear_rarity")
+    if mode != OFF:
+        summary["event_gear_rarity"] = _apply(
+            project, _rng(settings, "event_gear_rarity"), SHUFFLE,
+            _collect(reader, um, events, "GearRarity"), settings)
+
     return summary
+
+
+QUEST_CLASS = "CMQuestDefinition"
+"""Asset class holding a quest, its completion conditions and its rewards."""
+
+EVENT_CLASS = "CMInteractionEventDefinition"
+"""Asset class holding a map event, its pages and the actions they run."""
+
+QUANTITY_RANGE = (1, 999)
+"""Bounds an integer must fall in to be treated as a quantity.
+
+Quest and event exports also carry integers that are identifiers or packed
+flags rather than amounts. One reward slot stores 65536, which is a count of
+nothing and would become a demand for 65536 cards if it were rerolled. Real
+amounts in this data run from a single card to three hundred gold, so anything
+outside that band is left alone.
+"""
+
+
+def _quantities(reader, um, owners, class_prefix):
+    """Collect the amounts inside quest or event sub-objects.
+
+    Occurrences are grouped by the class that holds them together with the
+    property name, because the same name means different things in different
+    places: ``TakeAmount`` is two or three consumables on one class and up to
+    three hundred gold on another, and pooling those would have an event hand
+    out three gold or three hundred potions.
+
+    Exports are matched by class prefix, which also keeps dialogue out. Talk
+    box actions carry a bare ``IntValue`` that is a page number rather than an
+    amount, and rerolling it would send a conversation to the wrong line.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        um (cqmod.usmap.Usmap): Property schema.
+        owners (list): Quest or event assets to search.
+        class_prefix (str): Only exports whose class starts with this are read.
+
+    Returns:
+        dict[tuple, list]: ``(class name, property name)`` to a list of
+        ``(asset, offset, value, size)``.
+    """
+    low, high = QUANTITY_RANGE
+    groups = {}
+    for a in owners:
+        try:
+            body = reader.read(a.uexp)
+        except Exception:
+            continue
+        for e in a.exports:
+            if not e.class_name.startswith(class_prefix):
+                continue
+            for f in um.place(e, body):
+                if (f.type == "IntProperty" and f.offset >= 0
+                        and f.value is not None and low <= f.value <= high):
+                    groups.setdefault((e.class_name, f.name), []).append(
+                        (a, f.offset, f.value, f.size))
+    return groups
+
+
+def _apply_groups(project, rng, mode, groups, settings):
+    """Stage edits for each pool of a grouped collection separately.
+
+    Args:
+        project (cqmod.project.Project): Project to add edits to.
+        rng (random.Random): Generator for this category.
+        mode (str): ``shuffle`` or ``random``.
+        groups (dict): Output of :func:`_quantities`.
+        settings (Settings): Run settings, for variance.
+
+    Returns:
+        int: How many edits were staged across all pools.
+    """
+    return sum(_apply(project, rng, mode, groups[k], settings, low=1)
+               for k in sorted(groups))
+
+
+def _floats(reader, um, owners, class_prefix):
+    """Collect float knobs, grouped the same way as :func:`_quantities`.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        um (cqmod.usmap.Usmap): Property schema.
+        owners (list): Assets to search.
+        class_prefix (str): Only exports whose class starts with this are read.
+
+    Returns:
+        dict[tuple, list]: ``(class name, property name)`` to a list of
+        ``(asset, offset, value)``.
+    """
+    groups = {}
+    for a in owners:
+        try:
+            body = reader.read(a.uexp)
+        except Exception:
+            continue
+        for e in a.exports:
+            if not e.class_name.startswith(class_prefix):
+                continue
+            for f in um.place(e, body):
+                if f.type == "FloatProperty" and f.offset >= 0:
+                    value = struct.unpack_from("<f", body, f.offset)[0]
+                    groups.setdefault((e.class_name, f.name), []).append(
+                        (a, f.offset, value))
+    return groups
+
+
+def _apply_floats(project, rng, mode, groups, settings):
+    """Stage new values for float fields, one pool at a time.
+
+    Health effects are ratios, and some of them are negative: an event that
+    takes maximum health away stores -0.2 where one that grants it stores 0.2.
+    Rolling is therefore bounded by what the pool actually contains rather than
+    clamped at zero, so a reward can turn into a penalty but not into a number
+    the game has never seen.
+
+    Args:
+        project (cqmod.project.Project): Project to add edits to.
+        rng (random.Random): Generator for this category.
+        mode (str): ``shuffle`` or ``random``.
+        groups (dict): Output of :func:`_floats`.
+        settings (Settings): Run settings, for variance.
+
+    Returns:
+        int: How many edits were staged.
+    """
+    n = 0
+    for key in sorted(groups):
+        found = groups[key]
+        values = [v for _, _, v in found]
+        if mode == SHUFFLE:
+            new_values = list(values)
+            rng.shuffle(new_values)
+        else:
+            lo, hi = min(values), max(values)
+            if settings.variance:
+                span = max(abs(hi - lo), abs(hi)) or 1.0
+                lo -= span * settings.variance
+                hi += span * settings.variance
+            new_values = [rng.uniform(lo, hi) for _ in found]
+        for (a, off, old), value in zip(found, new_values):
+            value = round(value, 4)
+            if value == round(old, 4):
+                continue
+            project.set_value(a.path, off, value, f"{key[1]} {value:.3g}",
+                              is_float=True)
+            n += 1
+    return n
+
+
+def _reward_rows(reader, quests):
+    """Find the data table row each quest reward hands out.
+
+    A reward stores an ``FDataTableRowHandle``: two flag bytes, a reference to
+    the table, then the row's ``FName``. Property placement lands a couple of
+    bytes off on this struct, so the row is found by its table instead. An
+    import naming a ``DataTable`` is unambiguous inside a reward export, and
+    the row name sits four bytes past it.
+
+    The table is also what the reward is. Grouping by it keeps a card reward a
+    card and a relic reward a relic, without needing a list of valid rows,
+    which matters because consumable rows are keyed in Korean and do not match
+    any asset name.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        quests (list): Quest assets.
+
+    Returns:
+        dict[str, list]: Table name to a list of ``(asset, offset, row name)``.
+    """
+    groups = {}
+    for a in quests:
+        try:
+            body = reader.read(a.uexp)
+            pkg = uasset.parse(reader.read(a.uasset))
+        except Exception:
+            continue
+        for e in a.exports:
+            if not e.class_name.startswith("QuestCompleteReward"):
+                continue
+            hits = []
+            for o in range(e.start, max(e.start, e.end - 12)):
+                index = struct.unpack_from("<i", body, o)[0]
+                if index >= 0 or -index - 1 >= len(pkg.imports):
+                    continue
+                imp = pkg.imports[-index - 1]
+                if imp.class_name != "DataTable":
+                    continue
+                name_index, number = struct.unpack_from("<II", body, o + 4)
+                if number == 0 and name_index < len(pkg.names):
+                    hits.append((imp.object_name, o + 4,
+                                 pkg.names[name_index]))
+            # More than one candidate would make the choice a guess, and a
+            # reward pointing at the wrong row is worse than an unchanged one.
+            if len(hits) == 1:
+                table, off, row = hits[0]
+                groups.setdefault(table, []).append((a, off, row))
+    return groups
+
+
+def _shuffle_rewards(reader, rng, quests, project):
+    """Redistribute quest rewards within each kind.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        rng (random.Random): Generator for this category.
+        quests (list): Quest assets.
+        project (cqmod.project.Project): Project to add edits to.
+
+    Returns:
+        int: How many rewards were changed.
+    """
+    n = 0
+    groups = _reward_rows(reader, quests)
+    for table in sorted(groups):
+        found = groups[table]
+        pool = [row for _, _, row in found]
+        rng.shuffle(pool)
+        for (a, off, old), row in zip(found, pool):
+            if row == old:
+                continue
+            project.set_name_ref(a.path, off, row)
+            n += 1
+    return n
 
 
 def _collect_grouped(reader, um, assets, prop_name):

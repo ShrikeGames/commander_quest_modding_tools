@@ -540,6 +540,100 @@ def main():
               f"melee {sorted(melee)}, ranged {sorted(ranged)}")
         m6.close(); Path(tmp6).unlink()
 
+    print("\nquests and events:")
+    quest_keys = ("quest_rarity", "quest_conditions", "quest_rewards")
+    event_keys = ("event_values", "event_health", "event_gear_rarity")
+    qe = {k: randomizer.SHUFFLE for k in quest_keys + event_keys}
+    rp7 = Project(name="QuestsEvents")
+    sm7 = randomizer.run(r, assets, um,
+                         randomizer.Settings(seed=7, choices=qe), rp7)
+    check("every quest and event category produces edits",
+          all(sm7.get(k, 0) > 0 for k in quest_keys + event_keys), str(sm7))
+
+    quest_names = {x.name for x in assets
+                   if x.class_name == randomizer.QUEST_CLASS}
+    event_names = {x.name for x in assets
+                   if x.class_name == randomizer.EVENT_CLASS}
+    touched = {Path(v.asset_path).name for v in rp7.values} \
+        | {Path(t.asset_path).name for t in rp7.tags}
+    check("edits land only on quest and event assets",
+          touched <= quest_names | event_names,
+          str(sorted(touched - quest_names - event_names)[:3]))
+
+    # A talk box's IntValue is the page a line of dialogue belongs to, not an
+    # amount. Rerolling it would send a conversation to the wrong line, so the
+    # collector must never see it.
+    talk = set()
+    for a in (x for x in assets if x.class_name == randomizer.EVENT_CLASS):
+        body7 = r.read(a.uexp)
+        for e in a.exports:
+            if not e.class_name.startswith("CMTalkBoxActionParameter"):
+                continue
+            for f in um.place(e, body7):
+                if f.offset >= 0:
+                    talk.add((a.name, f.offset))
+    edited = {(Path(v.asset_path).name, v.offset) for v in rp7.values}
+    check("dialogue page numbers are never randomized",
+          talk and not (talk & edited), f"{len(talk)} talk box fields")
+
+    # TakeAmount means consumables on one class and gold on another. Pooling
+    # the two would have an event hand out three gold or three hundred potions.
+    gold = randomizer._quantities(
+        r, um, sorted((x for x in assets
+                       if x.class_name == randomizer.EVENT_CLASS),
+                      key=lambda a: a.name), "CMEventActionParameter")
+    gold_pool = {v for _, _, v, _ in gold[
+        ("CMEventActionParameter_TakeGold", "TakeAmount")]}
+    consumable_pool = {v for _, _, v, _ in gold[
+        ("CMEventActionParameter_TakeConsumable", "TakeAmount")]}
+    check("gold and consumable amounts stay in separate pools",
+          gold_pool and consumable_pool and not (gold_pool & consumable_pool),
+          f"gold {sorted(gold_pool)}, consumables {sorted(consumable_pool)}")
+
+    rewards = randomizer._reward_rows(
+        r, sorted((x for x in assets
+                   if x.class_name == randomizer.QUEST_CLASS),
+                  key=lambda a: a.name))
+    check("quest rewards are found for cards, relics and consumables",
+          set(rewards) == {"DT_Cards", "DT_Gears", "DT_Consumables"},
+          str(sorted(rewards)))
+    pools = {t: {row for _, _, row in v} for t, v in rewards.items()}
+    staged = {(Path(t.asset_path).name, t.offset): t.tag for t in rp7.tags}
+    kinds_ok = True
+    for table, entries in rewards.items():
+        for a, off, _ in entries:
+            new = staged.get((a.name, off))
+            if new is not None and new not in pools[table]:
+                kinds_ok = False
+    check("a reward stays the kind of thing it was", kinds_ok)
+
+    with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f7:
+        f7.write(rp7.build(r)); tmp7 = f7.name
+    m7 = PakReader(tmp7)
+    floats_ok = names_ok = 0
+    float_edits = [v for v in rp7.values if v.is_float]
+    for v in float_edits:
+        a = by[Path(v.asset_path).name]
+        got = struct.unpack_from("<f", m7.read(a.uexp), v.offset)[0]
+        floats_ok += abs(got - v.value) < 1e-3
+    check("health ratios are written as floats",
+          float_edits and floats_ok == len(float_edits),
+          f"{floats_ok}/{len(float_edits)}")
+    # Consumable rows are keyed in Korean, so a shuffled reward usually needs a
+    # name the quest has never carried, in the wide FString form.
+    wide = [t for t in rp7.tags if any(ord(c) > 127 for c in t.tag)]
+    for t in rp7.tags:
+        a = by[Path(t.asset_path).name]
+        index = struct.unpack_from("<I", m7.read(a.uexp), t.offset)[0]
+        after7 = uasset.parse(m7.read(a.uasset))
+        names_ok += (index < len(after7.names)
+                     and after7.names[index] == t.tag)
+    m7.close(); Path(tmp7).unlink()
+    check("every shuffled reward resolves to its new row",
+          names_ok == len(rp7.tags), f"{names_ok}/{len(rp7.tags)}")
+    check("rewards keyed in Korean survive the round trip", len(wide) > 0,
+          f"{len(wide)} non-ASCII rows")
+
     print("\nstarting decks:")
     rows = decks.card_rows(r)
     check("the card table's row names are readable", len(rows) > 200, f"{len(rows)} rows")

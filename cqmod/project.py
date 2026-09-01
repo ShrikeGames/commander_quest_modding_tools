@@ -110,20 +110,24 @@ class TextureEdit:
 
 @dataclass
 class ValueEdit:
-    """An overwrite of one ``int32`` inside an asset payload.
+    """An overwrite of one number inside an asset payload.
 
     Attributes:
         asset_path (str): Pak path of the asset, without extension.
         offset (int): Byte offset into its ``.uexp``. Find these with
             :func:`cqmod.diff.compare` rather than by hand.
-        value (int): Replacement value.
+        value (int | float): Replacement value.
         label (str): Optional note recorded for the build log.
+        is_float (bool): Write the value as an IEEE single rather than an
+            integer. Ratios such as an event's health reward are floats, and
+            packing one as an integer would store a number near zero instead.
     """
 
     asset_path: str
     offset: int
-    value: int
+    value: float
     label: str = ""
+    is_float: bool = False
 
 
 @dataclass
@@ -289,20 +293,21 @@ class Project:
                 return
         self.textures.append(TextureEdit(texture_path, image_path, source_texture))
 
-    def set_value(self, asset_path, offset, value, label=""):
+    def set_value(self, asset_path, offset, value, label="", is_float=False):
         """Stage a value overwrite, replacing any existing edit at the same offset.
 
         Args:
             asset_path (str): Pak path of the asset, without extension.
             offset (int): Byte offset into its ``.uexp``.
-            value (int): Replacement value.
+            value (int | float): Replacement value.
             label (str): Optional note for the build log.
+            is_float (bool): Write an IEEE single instead of an integer.
         """
         for v in self.values:
             if (v.asset_path, v.offset) == (asset_path, offset):
-                v.value, v.label = value, label
+                v.value, v.label, v.is_float = value, label, is_float
                 return
-        self.values.append(ValueEdit(asset_path, offset, value, label))
+        self.values.append(ValueEdit(asset_path, offset, value, label, is_float))
 
     def set_name_ref(self, asset_path, offset, name):
         """Stage a change to an ``FName`` reference in an asset's payload.
@@ -497,9 +502,13 @@ class Project:
                 if not (0 <= off <= len(payload_ba) - width):
                     raise ValueError(f"{asset}: offset {off} outside .uexp "
                                      f"(0..{len(payload_ba)-width})")
-                payload_ba[off:off + width] = int(v.value).to_bytes(
-                    width, "little", signed=width == 4)
-                say(f"  value  {Path(asset).name} @{v.offset} = {v.value}"
+                if v.is_float:
+                    struct.pack_into("<f", payload_ba, off, float(v.value))
+                else:
+                    payload_ba[off:off + width] = int(v.value).to_bytes(
+                        width, "little", signed=width == 4)
+                shown = f"{v.value:.3g}" if v.is_float else v.value
+                say(f"  value  {Path(asset).name} @{v.offset} = {shown}"
                     + (f"  ({v.label})" if v.label else ""))
 
             files[asset + ".uexp"] = bytes(payload_ba)

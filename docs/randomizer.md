@@ -42,10 +42,69 @@ should be less reasonable.
 | Commander starting decks | random | ten cards drawn from the whole pool |
 | Unit tags | shuffle | gameplay tags redistributed between units that have them |
 | Card art | shuffle | cosmetic, and likewise repointed rather than copied |
+| Quest rarity | shuffle | `QuestRarity`, which changes how often a quest is offered |
+| Quest requirements | shuffle, random | how much a quest asks of you, pooled by kind |
+| Quest rewards | shuffle | which card, relic or consumable a quest hands out |
+| Event numbers | shuffle, random | amounts events give and take: gold, cards, relics, consumables |
+| Event health effects | shuffle, random | the health ratios events apply to your commander |
+| Event relic rarity | shuffle | what rarity of relic an event awards |
 
 Relics are `CMGearDefinition` in the data. Their effects are separate exports
 just as cards' are, so the same numeric knobs are reachable: 151 relics carry
 `ResourceAmount`, `TriggerCount`, `BuffValue`, `HpAmmount` and similar.
+
+## Quests and events
+
+Quests are `CMQuestDefinition` and map events are `CMInteractionEventDefinition`.
+Both keep their moving parts in sub-objects of the same asset: a quest holds
+`QuestCompleteCondition_*` and `QuestCompleteReward_*` exports, and an event
+holds a `CMEventActionParameter_*` export per thing it does.
+
+### Amounts are pooled by what they count
+
+The same property name means different things on different classes. `TakeAmount`
+is two or three consumables on `TakeConsumable` and up to three hundred gold on
+`TakeGold`, so pooling by name alone would have an event hand out three gold or
+three hundred potions. Occurrences are therefore grouped by class **and** name,
+and only integers between 1 and 999 are taken. One reward slot stores 65536,
+which is not a count of anything and would otherwise become a demand for 65536
+cards.
+
+### Dialogue is left alone
+
+Events carry a `CMTalkBoxActionParameter_DefaultOneIntParameter` per line of
+dialogue, whose single `IntValue` is the page the line belongs to: 229 of the
+302 are `1`, and the rest run 2, 3, 4 upward. It reads like a quantity and is
+not one, so rerolling it would send a conversation to the wrong line. Only
+`CMEventActionParameter_*` exports are collected, which excludes it by
+construction, and the self-test asserts none of those 302 fields is ever
+written.
+
+### Health effects are floats, and some are negative
+
+`MaxHealthIncreaseRatio` is `0.2` on an event that grants maximum health and
+`-0.2` on one that takes it. These are the only float fields the randomizer
+writes, which is why `Project.set_value` grew an `is_float` flag: packing `0.2`
+as an integer would store a number near zero instead. Rolling is bounded by
+what the pool contains rather than clamped at zero, so a shrine that healed you
+can end up costing you, but never by an amount the game has never used.
+
+### Rewards are found by their table
+
+A reward stores an `FDataTableRowHandle`: two flag bytes, a reference to the
+table, then the row's `FName`, the same 14-byte shape a starting deck slot
+uses. Property placement lands a couple of bytes off on this struct, so the row
+is located by its table instead. A `DataTable` import inside a reward export is
+unambiguous, and the row name sits four bytes past it. That finds all 47
+rewards, and the one export it finds nothing in is the gold reward, which has
+no row handle.
+
+The table is also what the reward *is*, so grouping by it keeps a card reward a
+card and a relic reward a relic. That matters more than it sounds: consumable
+rows are keyed in Korean and match no asset name, so there is no list of valid
+rows to check against. It also means a shuffled consumable reward usually needs
+a row name its quest has never carried, which is what `add_name`'s wide
+`FString` form is for.
 
 ## Range and attack speed are banded
 
