@@ -153,7 +153,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Dwarf_Enemy_Gyrocopter+",
    "offset": 57,
-   "value": 0,
+   "value": 16,
    "label": "DA_Unit_Dwarf_Enemy_Gyrocopter+",
    "is_float": false
   },
@@ -257,14 +257,14 @@
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry",
-   "offset": 130,
+   "offset": 126,
    "value": 300,
    "label": "DA_Unit_Dwarf_MountainGoatCavalry",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry+",
-   "offset": 130,
+   "offset": 126,
    "value": 10,
    "label": "DA_Unit_Dwarf_MountainGoatCavalry+",
    "is_float": false
@@ -1560,7 +1560,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Huscarl+",
    "offset": 44,
-   "value": 0,
+   "value": 24,
    "label": "DA_Unit_Human_Huscarl+",
    "is_float": false
   },
@@ -3889,15 +3889,8 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry",
-   "offset": 138,
-   "value": 2,
-   "label": "DA_Unit_Dwarf_MountainGoatCavalry",
-   "is_float": false
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry+",
-   "offset": 138,
+   "offset": 134,
    "value": 3,
    "label": "DA_Unit_Dwarf_MountainGoatCavalry+",
    "is_float": false
@@ -3905,7 +3898,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Trebuchet",
    "offset": 88,
-   "value": 0,
+   "value": 2,
    "label": "DA_Unit_Dwarf_Trebuchet",
    "is_float": false
   },
@@ -4444,7 +4437,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_KillerRabbit+",
    "offset": 40,
-   "value": 0,
+   "value": 2,
    "label": "DA_Unit_Neutral_KillerRabbit+",
    "is_float": false
   },
@@ -4652,15 +4645,8 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry",
-   "offset": 143,
-   "value": 9,
-   "label": "DA_Unit_Dwarf_MountainGoatCavalry",
-   "is_float": false
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry+",
-   "offset": 143,
+   "offset": 139,
    "value": 10,
    "label": "DA_Unit_Dwarf_MountainGoatCavalry+",
    "is_float": false
@@ -4906,7 +4892,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_HarmlessSpirit",
    "offset": 106,
-   "value": 0,
+   "value": 9,
    "label": "DA_Unit_Enemy_HarmlessSpirit",
    "is_float": false
   },
@@ -5104,13 +5090,6 @@
    "offset": 98,
    "value": 10,
    "label": "DA_Unit_Human_Contractor",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Contractor+",
-   "offset": 98,
-   "value": 0,
-   "label": "DA_Unit_Human_Contractor+",
    "is_float": false
   },
   {
@@ -7118,7 +7097,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/CurseCards/DA_Card_Curse_SupplyShortage",
    "offset": 222,
-   "value": 10,
+   "value": 80,
    "label": "DA_Card_Curse_SupplyShortage",
    "is_float": false
   },
@@ -7132,7 +7111,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/Upgrade/DA_Card_Infra_AlcoholicFurnace+",
    "offset": 169,
-   "value": 60,
+   "value": 1,
    "label": "DA_Card_Infra_AlcoholicFurnace+",
    "is_float": false
   },
@@ -7188,14 +7167,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/Upgrade/DA_Card_Infra_Dwarf_Cenotaph+",
    "offset": 163,
-   "value": 10,
+   "value": 7,
    "label": "DA_Card_Infra_Dwarf_Cenotaph+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/DA_Card_Infra_Dwarf_MiningContract",
    "offset": 210,
-   "value": 1,
+   "value": 3,
    "label": "DA_Card_Infra_Dwarf_MiningContract",
    "is_float": false
   },
@@ -7204,6 +7183,13 @@
    "offset": 166,
    "value": 2,
    "label": "DA_Card_Infra_Dwarf_MiningContract+",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/InfraCards/DA_Card_Infra_HealFountain",
+   "offset": 152,
+   "value": 1,
+   "label": "DA_Card_Infra_HealFountain",
    "is_float": false
   },
   {
@@ -7225,6 +7211,13 @@
    "offset": 275,
    "value": 2,
    "label": "DA_Card_Infra_Human_HellBell",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/InfraCards/Upgrade/DA_Card_Infra_Human_HellBell+",
+   "offset": 35,
+   "value": 2,
+   "label": "DA_Card_Infra_Human_HellBell+",
    "is_float": false
   },
   {
@@ -7258,21 +7251,21 @@
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/DA_Card_Infra_LamellarWorkshop",
    "offset": 223,
-   "value": 10,
+   "value": 5,
    "label": "DA_Card_Infra_LamellarWorkshop",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/Upgrade/DA_Card_Infra_LamellarWorkshop+",
    "offset": 178,
-   "value": 3,
+   "value": 1,
    "label": "DA_Card_Infra_LamellarWorkshop+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/DA_Card_Infra_MiningBank",
    "offset": 138,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Infra_MiningBank",
    "is_float": false
   },
@@ -7293,7 +7286,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/Upgrade/DA_Card_Infra_MiningBank+",
    "offset": 103,
-   "value": 1,
+   "value": 2,
    "label": "DA_Card_Infra_MiningBank+",
    "is_float": false
   },
@@ -7307,7 +7300,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/InfraCards/DA_Card_Infra_Torch",
    "offset": 42,
-   "value": 3,
+   "value": 1,
    "label": "DA_Card_Infra_Torch",
    "is_float": false
   },
@@ -7335,7 +7328,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Dwarf_ArmorsmithSmith+",
    "offset": 4,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Summon_Dwarf_ArmorsmithSmith+",
    "is_float": false
   },
@@ -7354,13 +7347,6 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SummonCards/DA_Card_Summon_Dwarf_Miner",
-   "offset": 250,
-   "value": 1,
-   "label": "DA_Card_Summon_Dwarf_Miner",
-   "is_float": false
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Dwarf_Miner+",
    "offset": 211,
    "value": 1,
@@ -7370,14 +7356,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/DA_Card_Summon_Dwarf_Part-timeMiner",
    "offset": 262,
-   "value": 2,
+   "value": 10,
    "label": "DA_Card_Summon_Dwarf_Part-timeMiner",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Dwarf_Part-timeMiner+",
    "offset": 258,
-   "value": 1,
+   "value": 3,
    "label": "DA_Card_Summon_Dwarf_Part-timeMiner+",
    "is_float": false
   },
@@ -7398,7 +7384,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Dwarf_SteelDigger+",
    "offset": 217,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Summon_Dwarf_SteelDigger+",
    "is_float": false
   },
@@ -7417,10 +7403,10 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Human_GhostBat+",
-   "offset": 281,
-   "value": 5,
-   "label": "DA_Card_Summon_Human_GhostBat+",
+   "asset_path": "Commander/Content/Data/Cards/SummonCards/Upgrade/DA_Card_Summon_Human_GhostKnight+",
+   "offset": 216,
+   "value": 3,
+   "label": "DA_Card_Summon_Human_GhostKnight+",
    "is_float": false
   },
   {
@@ -7440,6 +7426,13 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SummonCards/DA_Card_Summon_Human_Tracker",
    "offset": 266,
+   "value": 2,
+   "label": "DA_Card_Summon_Human_Tracker",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SummonCards/DA_Card_Summon_Human_Tracker",
+   "offset": 308,
    "value": 2,
    "label": "DA_Card_Summon_Human_Tracker",
    "is_float": false
@@ -7496,7 +7489,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Dwarf_CoinToSteel",
    "offset": 135,
-   "value": 10,
+   "value": 2,
    "label": "DA_Card_Supply_Dwarf_CoinToSteel",
    "is_float": false
   },
@@ -7508,17 +7501,24 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Dwarf_Dismantle_Rebuild",
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Dwarf_Dismantle_Rebuild+",
    "offset": 12,
-   "value": 7,
-   "label": "DA_Card_Supply_Dwarf_Dismantle_Rebuild",
+   "value": 10,
+   "label": "DA_Card_Supply_Dwarf_Dismantle_Rebuild+",
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Dwarf_Dismantle_Rebuild+",
-   "offset": 12,
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Dwarf_StrategicResource",
+   "offset": 209,
    "value": 1,
-   "label": "DA_Card_Supply_Dwarf_Dismantle_Rebuild+",
+   "label": "DA_Card_Supply_Dwarf_StrategicResource",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Dwarf_StrategicResource",
+   "offset": 222,
+   "value": 30,
+   "label": "DA_Card_Supply_Dwarf_StrategicResource",
    "is_float": false
   },
   {
@@ -7529,30 +7529,30 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Dwarf_StrategicResource+",
-   "offset": 170,
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Dwarf_WorkloadAllocation",
+   "offset": 146,
    "value": 15,
-   "label": "DA_Card_Supply_Dwarf_StrategicResource+",
+   "label": "DA_Card_Supply_Dwarf_WorkloadAllocation",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Dwarf_WorkloadAllocation+",
    "offset": 93,
-   "value": 5,
+   "value": 1,
    "label": "DA_Card_Supply_Dwarf_WorkloadAllocation+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_ArmyoftheDead",
    "offset": 192,
-   "value": 4,
+   "value": 5,
    "label": "DA_Card_Supply_Human_ArmyoftheDead",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_ArmyoftheDead+",
    "offset": 156,
-   "value": 1,
+   "value": 4,
    "label": "DA_Card_Supply_Human_ArmyoftheDead+",
    "is_float": false
   },
@@ -7578,16 +7578,9 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_BlessofSpirit",
-   "offset": 32,
-   "value": 1,
-   "label": "DA_Card_Supply_Human_BlessofSpirit",
-   "is_float": false
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_BlessofSpirit+",
    "offset": 22,
-   "value": 3,
+   "value": 1,
    "label": "DA_Card_Supply_Human_BlessofSpirit+",
    "is_float": false
   },
@@ -7596,20 +7589,6 @@
    "offset": 32,
    "value": 1,
    "label": "DA_Card_Supply_Human_BlessofSpirit+",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_CompulsoryEnlistment",
-   "offset": 209,
-   "value": 2,
-   "label": "DA_Card_Supply_Human_CompulsoryEnlistment",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_CompulsoryEnlistment+",
-   "offset": 160,
-   "value": 1,
-   "label": "DA_Card_Supply_Human_CompulsoryEnlistment+",
    "is_float": false
   },
   {
@@ -7629,42 +7608,42 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_ExemplaryExecution",
    "offset": 209,
-   "value": 30,
+   "value": 10,
+   "label": "DA_Card_Supply_Human_ExemplaryExecution",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_ExemplaryExecution",
+   "offset": 226,
+   "value": 3,
    "label": "DA_Card_Supply_Human_ExemplaryExecution",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_ExemplaryExecution+",
-   "offset": 162,
-   "value": 4,
-   "label": "DA_Card_Supply_Human_ExemplaryExecution+",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_ExemplaryExecution+",
    "offset": 179,
-   "value": 1,
+   "value": 4,
    "label": "DA_Card_Supply_Human_ExemplaryExecution+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_Insight+",
    "offset": 68,
-   "value": 6,
+   "value": 1,
    "label": "DA_Card_Supply_Human_Insight+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Human_Insight+",
    "offset": 83,
-   "value": 1,
+   "value": 6,
    "label": "DA_Card_Supply_Human_Insight+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Human_TraceOfDash",
    "offset": 207,
-   "value": 2,
+   "value": 5,
    "label": "DA_Card_Supply_Human_TraceOfDash",
    "is_float": false
   },
@@ -7676,52 +7655,66 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_MetalChest",
-   "offset": 282,
-   "value": 5,
-   "label": "DA_Card_Supply_MetalChest",
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_BloodPrice",
+   "offset": 116,
+   "value": 1,
+   "label": "DA_Card_Supply_Neutral_BloodPrice",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_BloodPrice+",
    "offset": 77,
-   "value": 1,
+   "value": 5,
    "label": "DA_Card_Supply_Neutral_BloodPrice+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_HandMeDown",
-   "offset": 12,
-   "value": 5,
+   "offset": 253,
+   "value": 2,
    "label": "DA_Card_Supply_Neutral_HandMeDown",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_HandMeDown+",
-   "offset": 214,
-   "value": 2,
+   "offset": 12,
+   "value": 5,
    "label": "DA_Card_Supply_Neutral_HandMeDown+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_ManaCrystal",
    "offset": 234,
-   "value": 10,
+   "value": 30,
    "label": "DA_Card_Supply_Neutral_ManaCrystal",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_Reservist",
    "offset": 115,
-   "value": 5,
+   "value": 10,
    "label": "DA_Card_Supply_Neutral_Reservist",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_Reservist+",
+   "offset": 66,
+   "value": 2,
+   "label": "DA_Card_Supply_Neutral_Reservist+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_Strategist",
    "offset": 116,
-   "value": 6,
+   "value": 10,
    "label": "DA_Card_Supply_Neutral_Strategist",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_Strategist+",
+   "offset": 66,
+   "value": 1,
+   "label": "DA_Card_Supply_Neutral_Strategist+",
    "is_float": false
   },
   {
@@ -7734,7 +7727,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_TemptingOffer+",
    "offset": 148,
-   "value": 33,
+   "value": 2,
    "label": "DA_Card_Supply_Neutral_TemptingOffer+",
    "is_float": false
   },
@@ -7748,8 +7741,15 @@
   {
    "asset_path": "Commander/Content/Data/Cards/SupplyCards/DA_Card_Supply_Neutral_ToothExtraction",
    "offset": 248,
-   "value": 1,
+   "value": 33,
    "label": "DA_Card_Supply_Neutral_ToothExtraction",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/SupplyCards/Upgrade/DA_Card_Supply_Neutral_ToothExtraction+",
+   "offset": 191,
+   "value": 1,
+   "label": "DA_Card_Supply_Neutral_ToothExtraction+",
    "is_float": false
   },
   {
@@ -7762,28 +7762,35 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_BuildingStrengthen",
    "offset": 2,
-   "value": 10,
+   "value": 3,
    "label": "DA_Card_Tactics_BuildingStrengthen",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_BuildingStrengthen+",
    "offset": 2,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Tactics_BuildingStrengthen+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_CurseDoll",
    "offset": 116,
+   "value": 10,
+   "label": "DA_Card_Tactics_CurseDoll",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_CurseDoll",
+   "offset": 120,
    "value": 2,
    "label": "DA_Card_Tactics_CurseDoll",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_CurseDoll+",
-   "offset": 82,
-   "value": 10,
+   "offset": 78,
+   "value": 5,
    "label": "DA_Card_Tactics_CurseDoll+",
    "is_float": false
   },
@@ -7792,13 +7799,6 @@
    "offset": 12,
    "value": 1,
    "label": "DA_Card_Tactics_Dwarf_LiberationFront",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_LiberationFront+",
-   "offset": 12,
-   "value": 1,
-   "label": "DA_Card_Tactics_Dwarf_LiberationFront+",
    "is_float": false
   },
   {
@@ -7811,49 +7811,63 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_StoneBeer+",
    "offset": 8,
-   "value": 6,
+   "value": 1,
    "label": "DA_Card_Tactics_Dwarf_StoneBeer+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Dwarf_TomatoJuice",
    "offset": 251,
-   "value": 1,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_TomatoJuice",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_TomatoJuice+",
    "offset": 198,
-   "value": 3,
+   "value": 6,
    "label": "DA_Card_Tactics_Dwarf_TomatoJuice+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Dwarf_VertigoBomb",
    "offset": 245,
-   "value": 30,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_VertigoBomb",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Dwarf_VertigoBomb",
-   "offset": 249,
-   "value": 10,
+   "offset": 261,
+   "value": 3,
+   "label": "DA_Card_Tactics_Dwarf_VertigoBomb",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Dwarf_VertigoBomb",
+   "offset": 265,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_VertigoBomb",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_VertigoBomb+",
    "offset": 154,
-   "value": 1,
+   "value": 10,
+   "label": "DA_Card_Tactics_Dwarf_VertigoBomb+",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_VertigoBomb+",
+   "offset": 170,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_VertigoBomb+",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Dwarf_ViperRum",
    "offset": 331,
-   "value": 1,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_ViperRum",
    "is_float": false
   },
@@ -7867,7 +7881,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Dwarf_ViperRum+",
    "offset": 327,
-   "value": 11,
+   "value": 2,
    "label": "DA_Card_Tactics_Dwarf_ViperRum+",
    "is_float": false
   },
@@ -7881,7 +7895,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_ArrowRain",
    "offset": 154,
-   "value": 3,
+   "value": 60,
    "label": "DA_Card_Tactics_Enemy_ArrowRain",
    "is_float": false
   },
@@ -7951,14 +7965,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_Neutral_FireArrowRain",
    "offset": 361,
-   "value": 1,
+   "value": 2,
    "label": "DA_Card_Tactics_Enemy_Neutral_FireArrowRain",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_Neutral_FireArrowRain",
    "offset": 365,
-   "value": 6,
+   "value": 10,
    "label": "DA_Card_Tactics_Enemy_Neutral_FireArrowRain",
    "is_float": false
   },
@@ -7972,14 +7986,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_Suicide",
    "offset": 108,
-   "value": 10,
+   "value": 5,
    "label": "DA_Card_Tactics_Enemy_Suicide",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_Suicide",
    "offset": 123,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Tactics_Enemy_Suicide",
    "is_float": false
   },
@@ -7993,7 +8007,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_TormentOfLoss",
    "offset": 116,
-   "value": 1,
+   "value": 4,
+   "label": "DA_Card_Tactics_Enemy_TormentOfLoss",
+   "is_float": false
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/TacticsCards/Enemy/DA_Card_Tactics_Enemy_TormentOfLoss",
+   "offset": 120,
+   "value": 6,
    "label": "DA_Card_Tactics_Enemy_TormentOfLoss",
    "is_float": false
   },
@@ -8005,10 +8026,10 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Human_BroadRock+",
-   "offset": 12,
-   "value": 30,
-   "label": "DA_Card_Tactics_Human_BroadRock+",
+   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Human_ChargingTraining",
+   "offset": 207,
+   "value": 1,
+   "label": "DA_Card_Tactics_Human_ChargingTraining",
    "is_float": false
   },
   {
@@ -8019,30 +8040,16 @@
    "is_float": false
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Human_ChargingTraining+",
-   "offset": 166,
-   "value": 5,
-   "label": "DA_Card_Tactics_Human_ChargingTraining+",
-   "is_float": false
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Human_PhantomSpear",
    "offset": 136,
-   "value": 8,
-   "label": "DA_Card_Tactics_Human_PhantomSpear",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Human_PhantomSpear",
-   "offset": 140,
-   "value": 2,
+   "value": 1,
    "label": "DA_Card_Tactics_Human_PhantomSpear",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Human_PhantomSpear+",
    "offset": 95,
-   "value": 2,
+   "value": 11,
    "label": "DA_Card_Tactics_Human_PhantomSpear+",
    "is_float": false
   },
@@ -8070,7 +8077,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_MindAttack+",
    "offset": 115,
-   "value": 1,
+   "value": 2,
    "label": "DA_Card_Tactics_MindAttack+",
    "is_float": false
   },
@@ -8084,14 +8091,14 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Neutral_ArrowRain",
    "offset": 154,
-   "value": 3,
+   "value": 6,
    "label": "DA_Card_Tactics_Neutral_ArrowRain",
    "is_float": false
   },
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Neutral_ArrowRain",
    "offset": 158,
-   "value": 2,
+   "value": 30,
    "label": "DA_Card_Tactics_Neutral_ArrowRain",
    "is_float": false
   },
@@ -8105,7 +8112,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/TacticsCards/Upgrade/DA_Card_Tactics_Neutral_ArrowRain+",
    "offset": 120,
-   "value": 5,
+   "value": 8,
    "label": "DA_Card_Tactics_Neutral_ArrowRain+",
    "is_float": false
   },
@@ -8121,13 +8128,6 @@
    "offset": 270,
    "value": 6,
    "label": "DA_Card_Tactics_Neutral_FireArrowRain+",
-   "is_float": false
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/TacticsCards/DA_Card_Tactics_Neutral_Linker",
-   "offset": 12,
-   "value": 4,
-   "label": "DA_Card_Tactics_Neutral_Linker",
    "is_float": false
   },
   {
@@ -11058,18 +11058,28 @@
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_C1_Boss_BatteringRam",
-   "offset": 71,
+   "offset": 63,
    "tag": "Card.SummonType.Militia"
   },
   {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_C1_Boss_BatteringRam",
+   "offset": 71,
+   "tag": "Minion.Type.Building"
+  },
+  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_C1_Boss_CastleDoor",
-   "offset": 38,
+   "offset": 30,
    "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_C1_Boss_CastleDoor",
+   "offset": 38,
+   "tag": "EffectType.Deploy"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_C1_Boss_CastleDoor",
    "offset": 46,
-   "tag": "UnitTag.Enemy.Type.Goblin.MerchantSon"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Etc/DA_Unit_C1_Boss_SiegeTower",
@@ -11079,22 +11089,12 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Etc/DA_Unit_C1_Boss_SiegeTower",
    "offset": 36,
-   "tag": "EffectType.Death"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Ballista",
-   "offset": 57,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Ballista+",
-   "offset": 57,
-   "tag": "Card.SummonType.Militia"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Bibi_Beep",
    "offset": 47,
-   "tag": "Card.SummonType.Trebuchet"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Bibi_Beep+",
@@ -11104,36 +11104,36 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_BoltSpitter",
    "offset": 51,
-   "tag": "Card.SummonType.Trebuchet"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_BoltSpitter+",
-   "offset": 51,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_BreweryWatcher",
    "offset": 49,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_BreweryWatcher+",
    "offset": 49,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Culverin",
-   "offset": 75,
-   "tag": "Minion.Type.Building"
+   "offset": 83,
+   "tag": "Card.SummonType.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Enemy_Trebuchet",
    "offset": 71,
-   "tag": "Minion.Type.Building"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Enemy_Trebuchet",
    "offset": 79,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_GriffinRider",
+   "offset": 176,
    "tag": "Minion.AttackType.Projectile"
   },
   {
@@ -11143,68 +11143,78 @@
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_GriffinRider+",
+   "offset": 163,
+   "tag": "Minion.Type.Cavalry"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_GriffinRider+",
    "offset": 258,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MechFeeder",
    "offset": 15,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_MechFeeder+",
    "offset": 15,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.Type.Building"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_SteelBulletSpitter",
-   "offset": 43,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_SteelBulletSpitterA",
-   "offset": 43,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_SteelBulletSpitterB",
-   "offset": 60,
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry",
+   "offset": 118,
    "tag": "Card.SummonType.Militia"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry+",
+   "offset": 37,
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_MountainGoatCavalry+",
+   "offset": 118,
+   "tag": "Card.SummonType.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_StationaryBoltSpitter",
+   "offset": 51,
+   "tag": "Card.SummonType.Militia"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_SteelBulletSpitter+",
+   "offset": 43,
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Trebuchet",
    "offset": 55,
-   "tag": "Minion.Type.Building"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Trebuchet",
    "offset": 63,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_Trebuchet",
    "offset": 71,
+   "tag": "Minion.Type.Cavalry"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Trebuchet+",
+   "offset": 63,
    "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Trebuchet+",
-   "offset": 55,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Trebuchet+",
-   "offset": 63,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_Trebuchet+",
    "offset": 71,
-   "tag": "Card.SummonType.Militia"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Dwarf_YK-51",
    "offset": 43,
-   "tag": "Card.SummonType.Cavalry"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Dwarf_YK-51+",
@@ -11212,44 +11222,54 @@
    "tag": "Minion.AttackType.Projectile"
   },
   {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_AmbushArcher",
+   "offset": 52,
+   "tag": "Minion.Type.Cavalry"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_AmbushCavalry",
+   "offset": 37,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Archer",
    "offset": 50,
-   "tag": "Minion.Type.Building"
+   "tag": "Card.SummonType.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Ballista",
    "offset": 57,
-   "tag": "Minion.Type.Building"
+   "tag": "Card.SummonType.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barrack_Boss_C1_2_GreatSword",
    "offset": 69,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barrack_Boss_C1_2_GreatSword",
    "offset": 77,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barrack_Boss_C1_2_LongbowArcher",
-   "offset": 69,
    "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barrack_Boss_C1_2_LongbowArcher",
-   "offset": 77,
-   "tag": "Minion.Type.Building"
+   "offset": 69,
+   "tag": "Card.SummonType.Ghost"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barricade",
-   "offset": 65,
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barrack_Boss_C1_2_LongbowArcher",
+   "offset": 77,
    "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barricade",
+   "offset": 65,
+   "tag": "EffectType.Death"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barricade",
    "offset": 73,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Barricade_Boss1",
@@ -11259,7 +11279,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Cataphract",
    "offset": 45,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Dragon",
@@ -11267,24 +11287,9 @@
    "tag": "Minion.Type.Cavalry"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Dwarf_BoltSpitter",
-   "offset": 51,
-   "tag": "Card.SummonType.Militia"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Dwarf_BreweryWatcher",
-   "offset": 49,
-   "tag": "Card.SummonType.Building"
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Dwarf_SteelBulletSpitter",
    "offset": 59,
    "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_EliteKnight",
-   "offset": 52,
-   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Elite_C2_3_BatteringRam",
@@ -11294,12 +11299,12 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_FireflaskThrower",
    "offset": 58,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GhostBat",
    "offset": 38,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "UnitTag.Enemy.Type.Goblin.MerchantSon"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GoblinMerchantSon",
@@ -11309,42 +11314,37 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GrowingSquire",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GuardPost",
-   "offset": 75,
    "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GuardPost",
    "offset": 83,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GuardPost_RangeUp",
    "offset": 75,
-   "tag": "Minion.Type.Building"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_GuardPost_RangeUp",
    "offset": 83,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_HorseArcher",
    "offset": 54,
-   "tag": "Card.SummonType.Militia"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_HorseArcher",
    "offset": 62,
-   "tag": "BattleEvent.Gimmick.Action.Type2.Execute"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Khan",
    "offset": 63,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_LargeSpider",
@@ -11354,32 +11354,27 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_LightCavalry",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_LongbowArcher",
    "offset": 43,
-   "tag": "Card.SummonType.Building"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_MiniSpider",
    "offset": 36,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_MusketSharpshooter",
-   "offset": 51,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_OrcBowHolder",
    "offset": 51,
-   "tag": "Card.SummonType.Militia"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_OrconiumContainer",
    "offset": 164,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Card.SummonType.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Richard",
@@ -11392,19 +11387,24 @@
    "tag": "Minion.Type.Cavalry"
   },
   {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_StationaryArcher",
+   "offset": 61,
+   "tag": "BattleEvent.Gimmick.Action.Type2"
+  },
+  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_T4_Dwarf_SteelBulletSpitter",
    "offset": 218,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_WargRider",
    "offset": 50,
-   "tag": "BattleEvent.Gimmick.Action.Type1"
+   "tag": "Card.SummonType.Trebuchet"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_Zamyeonggo",
-   "offset": 121,
-   "tag": "Minion.AttackType.Projectile"
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_Enemy_ZhugeLiang",
+   "offset": 88,
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonBabyEgg",
@@ -11414,31 +11414,36 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonEgg",
    "offset": 46,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Bottom",
    "offset": 96,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Bottom",
    "offset": 116,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Bottom",
+   "offset": 177,
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Top",
    "offset": 109,
-   "tag": "BattleEvent.Gimmick.Action.Type2"
+   "tag": "Card.SummonType.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Top",
    "offset": 129,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.Type.Cavalry"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_ForgottenAltar",
-   "offset": 117,
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Environment_DragonGem_Top",
+   "offset": 191,
    "tag": "Minion.Type.Cavalry"
   },
   {
@@ -11449,32 +11454,22 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_HellGuideArcher",
    "offset": 63,
-   "tag": "Card.SummonType.Building"
+   "tag": "Minion.Type.Spider"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_HellGuideArcher+",
    "offset": 63,
-   "tag": "Card.SummonType.Trebuchet"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_HolyOrder_Human",
    "offset": 36,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "BattleEvent.Gimmick.Action.Type2.Execute"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Huaca",
    "offset": 43,
    "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_AmplifyingPyromancer",
-   "offset": 110,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_AmplifyingPyromancer+",
-   "offset": 110,
-   "tag": "Card.SummonType.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Archer",
@@ -11484,15 +11479,25 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Archer",
    "offset": 58,
+   "tag": "Minion.Type.Cavalry"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Archer+",
+   "offset": 50,
    "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Archer+",
    "offset": 58,
-   "tag": "Card.SummonType.Building"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Barricade",
+   "offset": 53,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Barricade+",
    "offset": 53,
    "tag": "Minion.Type.Cavalry"
   },
@@ -11504,17 +11509,32 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Cataphract+",
    "offset": 45,
-   "tag": "BattleEvent.Gimmick.Action.Type1.Execute"
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Crossbowman",
+   "offset": 57,
+   "tag": "Card.SummonType.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Crossbowman+",
    "offset": 57,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Card.SummonType.Militia"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Dragon",
+   "offset": 56,
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_FireflaskThrower",
    "offset": 92,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_FireflaskThrower+",
+   "offset": 92,
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Ghost+",
@@ -11524,47 +11544,42 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostArcher+",
    "offset": 58,
-   "tag": "EffectType.Deploy"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostBat+",
    "offset": 38,
+   "tag": "Card.SummonType.Militia"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostKnight",
+   "offset": 45,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostKnight",
+   "offset": 53,
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostKnight+",
+   "offset": 45,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostKnight+",
+   "offset": 53,
    "tag": "Minion.Type.CastleDoor"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostKnight",
-   "offset": 45,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostKnight",
-   "offset": 53,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GhostKnight",
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostKnight+",
    "offset": 61,
-   "tag": "Card.SummonType.Militia"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostKnight+",
-   "offset": 45,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GhostKnight+",
-   "offset": 53,
-   "tag": "Card.SummonType.Militia"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GrowingSquire",
    "offset": 37,
-   "tag": "Card.SummonType.Militia"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+",
-   "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Card.SummonType.Trebuchet"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+10",
@@ -11572,14 +11587,19 @@
    "tag": "EffectType.Death"
   },
   {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+11",
+   "offset": 37,
+   "tag": "Card.SummonType.Trebuchet"
+  },
+  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+12",
    "offset": 37,
-   "tag": "Card.SummonType.Building"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+13",
    "offset": 37,
-   "tag": "Minion.Feature.EyeImmune"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+14",
@@ -11589,17 +11609,12 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+15",
    "offset": 37,
-   "tag": "Minion.Type.Building"
+   "tag": "BattleEvent.Gimmick.Action.Type1.Execute"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+16",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+17",
-   "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+18",
@@ -11609,30 +11624,25 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+19",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+2",
    "offset": 37,
-   "tag": "Minion.Feature.EyeImmune"
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+20",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Feature.EyeImmune"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+3",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Spider"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+4",
-   "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+5",
    "offset": 37,
    "tag": "Minion.AttackType.Projectile"
   },
@@ -11644,17 +11654,17 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+7",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Feature.EyeImmune"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+8",
    "offset": 37,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GrowingSquire+9",
    "offset": 37,
-   "tag": "EffectType.Death"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_GuardPost",
@@ -11663,83 +11673,53 @@
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GuardPost+",
-   "offset": 73,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_GuardPost+",
    "offset": 81,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_HorseArcher",
-   "offset": 62,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_HorseArcher+",
-   "offset": 62,
-   "tag": "Card.SummonType.Militia"
+   "offset": 54,
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_LightCavalry",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "EffectType.Death"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_LightCavalry+",
    "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_LongbowArcher",
-   "offset": 43,
-   "tag": "Minion.Type.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_LongbowArcher+",
-   "offset": 43,
    "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Shielder",
    "offset": 40,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Shielder+",
    "offset": 40,
-   "tag": "Card.SummonType.Ghost"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Spearman",
    "offset": 48,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_Spearman+",
    "offset": 48,
-   "tag": "Card.SummonType.Building"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_SupressingWindspire",
-   "offset": 135,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_SupressingWindspire",
    "offset": 143,
-   "tag": "Minion.Type.Cavalry"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_SupressingWindspire+",
-   "offset": 139,
-   "tag": "Minion.Type.Building"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Human_SupressingWindspire+",
    "offset": 147,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Card.SummonType.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Tracker",
@@ -11752,26 +11732,6 @@
    "tag": "Minion.Type.Cavalry"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_Trench",
-   "offset": 53,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_VisionaryIllusionist",
-   "offset": 86,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Human_VisionaryIllusionist_Clone",
-   "offset": 38,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_AmbushCavalry",
-   "offset": 37,
-   "tag": "Minion.AttackType.Projectile"
-  },
-  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_AmbushCavalry+",
    "offset": 37,
    "tag": "Minion.AttackType.Projectile"
@@ -11782,6 +11742,16 @@
    "tag": "Minion.Type.Cavalry"
   },
   {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_BloodAscetic",
+   "offset": 16,
+   "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_BloodAscetic+",
+   "offset": 16,
+   "tag": "Minion.Type.Building"
+  },
+  {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_DrillInstructor",
    "offset": 153,
    "tag": "Minion.AttackType.Projectile"
@@ -11789,27 +11759,32 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_DrillInstructor+",
    "offset": 153,
-   "tag": "EffectType.Death"
+   "tag": "Card.SummonType.Ghost"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_Gunpowder",
    "offset": 90,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_Gunpowder+",
    "offset": 90,
-   "tag": "Card.SummonType.Militia"
+   "tag": "EffectType.Death"
   },
   {
-   "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_Gunpowder_Boss",
-   "offset": 102,
-   "tag": "Minion.AttackType.Projectile"
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Legacy/DA_Unit_Neutral_GunpowderCarrier",
+   "offset": 18,
+   "tag": "Minion.Type.Building"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Legacy/DA_Unit_Neutral_GunpowderCarrier+",
+   "offset": 18,
+   "tag": "Card.SummonType.Militia"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_KillerRabbitFarm",
    "offset": 103,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "BattleEvent.Gimmick.Action.Type1"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_KillerRabbitFarm+",
@@ -11824,12 +11799,12 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_Militia+",
    "offset": 33,
-   "tag": "Minion.Type.Cavalry"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_MusketSharpshooter",
    "offset": 52,
-   "tag": "Minion.Type.Spider"
+   "tag": "Minion.Type.Building"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_MusketSharpshooter+",
@@ -11839,22 +11814,27 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Neutral_WrathTideMilitia",
    "offset": 33,
-   "tag": "Minion.AttackType.Projectile"
+   "tag": "Minion.Type.Cavalry"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Neutral_WrathTideMilitia+",
    "offset": 33,
-   "tag": "Minion.Type.Spider"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_Richard_EliteKnight",
    "offset": 57,
-   "tag": "Card.SummonType.Ghost"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Upgrade/DA_Unit_Richard_EliteKnight+",
    "offset": 57,
    "tag": "Minion.AttackType.Projectile"
+  },
+  {
+   "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_TotemOfRegeneration",
+   "offset": 92,
+   "tag": "Minion.Type.Spider"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_TotemOfSight",
@@ -11864,7 +11844,7 @@
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/Enemy/DA_Unit_TotemOfWind",
    "offset": 83,
-   "tag": "Minion.Type.Spider"
+   "tag": "Minion.AttackType.Projectile"
   },
   {
    "asset_path": "Commander/Content/Data/Cards/UnitData/DA_Unit_WoodCabin",

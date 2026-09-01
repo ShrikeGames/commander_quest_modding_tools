@@ -255,8 +255,55 @@ def main():
             ex = next(x for x in u.exports if x.class_name == "CMUnitData")
             if len(um.place(ex, pl3)) == len(ex.prop_indices):
                 placed_all += 1
-        check("every unit asset places completely", placed_all == len(units),
-              f"{placed_all}/{len(units)}")
+        # Not every unit can place completely, and pretending otherwise is what
+        # produced corrupt mods. A handful have a value region that more than
+        # one arrangement of properties accounts for exactly, so the layout is
+        # not proven and the tail is left unplaced rather than guessed at.
+        check("almost every unit asset places completely",
+              placed_all >= len(units) - 5, f"{placed_all}/{len(units)}")
+
+        # The property that matters most must still be reachable everywhere,
+        # since a unit that cannot place MaxHealth cannot be edited at all.
+        with_health = sum(
+            1 for u in units
+            for e2 in u.exports if e2.class_name == "CMUnitData"
+            if any(f.name == "MaxHealth" for f in um.place(e2, r.read(u.uexp))))
+        check("MaxHealth is placeable on every unit",
+              with_health == len(units), f"{with_health}/{len(units)}")
+
+        # A gameplay tag is an FName, so a container of them is a count and
+        # eight bytes per tag, exactly. Letting the search try other widths let
+        # a wrong layout balance out against a later container, which put
+        # MaxHealth inside the tag data and produced mods the game rejected.
+        containers = exact = 0
+        for u in units:
+            pl5 = r.read(u.uexp)
+            for e5 in u.exports:
+                for f5 in um.place(e5, pl5):
+                    if not um.is_tag_container(e5, f5.index) or f5.offset < 0:
+                        continue
+                    containers += 1
+                    count = struct.unpack_from("<i", pl5, f5.offset)[0]
+                    exact += f5.size == 4 + 8 * count
+        check("a tag container is placed at exactly four bytes plus eight a tag",
+              containers and exact == containers, f"{exact}/{containers}")
+
+        # The failure mode this guards against: an edit whose offset falls
+        # inside a tag container overwrites a name index or the count itself.
+        intruders = []
+        for u in units:
+            pl6 = r.read(u.uexp)
+            for e6 in u.exports:
+                fields = um.place(e6, pl6)
+                spans = [(f6.offset, f6.offset + f6.size) for f6 in fields
+                         if um.is_tag_container(e6, f6.index) and f6.offset >= 0]
+                for f6 in fields:
+                    if f6.offset < 0 or um.is_tag_container(e6, f6.index):
+                        continue
+                    if any(lo < f6.offset < hi for lo, hi in spans):
+                        intruders.append((u.name, f6.name, f6.offset))
+        check("no property is placed inside a tag container", not intruders,
+              str(intruders[:3]))
 
         check("unit stats match the values shown in game",
               stats.get("DA_Unit_Human_Cataphract", {}).get("MaxHealth") == 13

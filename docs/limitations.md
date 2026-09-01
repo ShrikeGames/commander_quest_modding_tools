@@ -27,6 +27,14 @@ knowing how long each one is, and the walk stops at the first array or struct
 whose length cannot be determined, leaving the tail of that export unaddressed.
 On a summon card that boundary falls before the illustration.
 
+It also stops when more than one arrangement of properties accounts for the
+value region exactly. Two containers can be mis-sized in opposite directions and
+still add up, so a layout that fits is not necessarily the right one. Reporting
+the first arrangement found was worse than reporting nothing: a wrong offset
+does not fail, it writes into whatever really lives there, and a number landing
+in a gameplay tag container leaves a package the game refuses to load. Ambiguity
+is therefore treated as failure, the same as finding no layout at all.
+
 Where the target is an object reference there is a way around it: the reference
 holds a known package index, so the payload can be searched for that value
 directly, accepting a match only when it is unique. That is how art and model

@@ -409,27 +409,31 @@ class Usmap:
             if not 0 <= n <= 4096:
                 fixed = self.sizes.get((export.class_name, idx))
                 return [fixed] if fixed is not None else []
-            # The element width the schema implies comes first, but the other
-            # plausible widths stay available: the search keeps whichever makes
-            # the payload add up, so an unusual asset still resolves instead of
-            # failing outright.
-            widths = [8, 4, 16, 1, 12, 32, 24]
+            # Where the element width is known there is nothing to guess, and
+            # offering alternatives would invent an ambiguity that does not
+            # exist: a gameplay tag is an FName, and an array of a fixed-size
+            # type has a fixed stride. Guessing is reserved for containers whose
+            # element type the schema does not pin down.
+            known = None
             if t == "StructProperty" and p.get("struct") == TAG_CONTAINER:
-                first = 8
+                known = 8
             elif t in ("ArrayProperty", "SetProperty"):
-                first = SERIALIZED_SIZE.get(p.get("inner", ""), 4)
-            else:
-                first = None
-            if first is not None:
-                widths = [first] + [w for w in widths if w != first]
+                known = SERIALIZED_SIZE.get(p.get("inner", ""))
+            widths = [known] if known is not None else [8, 4, 16, 1, 12, 32, 24]
             out = [4 + n * w for w in widths]
             fixed = self.sizes.get((export.class_name, idx))
             if fixed is not None and fixed not in out:
                 out.append(fixed)
             return out
 
+        solutions = []
+
         def search(i, cursor, acc):
-            """Find a layout that consumes the value region exactly.
+            """Collect layouts that consume the value region exactly.
+
+            The search stops once two have been found. One proves a placement;
+            two prove it is a guess, and which one is reported would then be an
+            accident of the order the candidate sizes happen to be tried in.
 
             Args:
                 i (int): Position in ``order``.
@@ -437,24 +441,33 @@ class Usmap:
                 acc (list): Placements chosen so far.
 
             Returns:
-                list | None: A complete layout, or None if this branch fails.
+                None: Results are collected into ``solutions``.
             """
+            if len(solutions) >= 2:
+                return
             if i == len(order):
-                return acc if cursor == vend else None
+                if cursor == vend:
+                    solutions.append(acc)
+                return
             idx = order[i]
             if idx in zero:
-                return search(i + 1, cursor, acc + [(idx, -1, 0)])
+                search(i + 1, cursor, acc + [(idx, -1, 0)])
+                return
             for size in candidates(idx, cursor):
                 if size < 0 or cursor + size > vend:
                     continue
-                got = search(i + 1, cursor + size, acc + [(idx, cursor, size)])
-                if got is not None:
-                    return got
-            return None
+                search(i + 1, cursor + size, acc + [(idx, cursor, size)])
+                if len(solutions) >= 2:
+                    return
 
-        layout = search(0, vstart, [])
+        search(0, vstart, [])
+        layout = solutions[0] if len(solutions) == 1 else None
         if layout is None:
-            # No arrangement accounts for every byte, so place only the prefix
+            # Either no arrangement accounts for every byte, or more than one
+            # does and the choice between them would be a guess. A wrong offset
+            # is worse than a missing one: it writes into whatever really lives
+            # there, and a value landing in a tag container's count produces a
+            # package the game rejects as corrupt. So place only the prefix
             # that is certain rather than reporting positions that may be wrong.
             layout = []
             cursor = vstart

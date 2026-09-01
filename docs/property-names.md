@@ -236,3 +236,24 @@ is the player's pool, and the tag containers hold card types rather than costs.
 `GetDisplayUseCost` exists only as a function, so the number on the collection
 screen is computed at runtime. That is why correlating known costs against card
 payloads found nothing, and it is not something a value edit can change.
+
+## A layout that fits is not always the right one
+
+Placement searches for an arrangement of properties that consumes an export's
+value region exactly. That check is strong but not a proof: a container whose
+element width has to be guessed can be too big while a later one is too small,
+and the total still lands on the right byte.
+
+Where the element width is known there is nothing to guess, so it is not
+guessed. A gameplay tag is an `FName`, so a container of them is a count plus
+eight bytes per tag; an array of a fixed-size type has a fixed stride. Offering
+alternatives for those invented ambiguity that did not exist, and it was that
+invented ambiguity which mis-placed `MaxHealth` on seventeen units: the search
+sized their `Tags` container wrongly, balanced the error against a later array,
+and put the health value inside the tag data.
+
+What remains genuinely ambiguous is left unplaced. Across the catalog that is
+two exports out of 7,585, against 5,790 placed uniquely, and pinning the known
+widths raised the number of fields reachable overall from 18,742 to 19,740.
+Being stricter cost nothing and gained coverage, because the guesses were
+buying wrong answers rather than extra ones.
