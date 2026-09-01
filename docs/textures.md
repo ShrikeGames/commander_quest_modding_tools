@@ -116,3 +116,27 @@ depth alone picks an elephant for the Gyrocopter.
 
 322 of 325 units resolve at least one texture, and the editor lists them all so
 the guess can be overridden.
+
+## Repointing instead of replacing
+
+Replacing a texture rewrites its pixels. Pointing an asset at a *different*
+texture is cheaper and often what is actually wanted, but it needs an entry in
+the referring package's import table, and an asset only imports the textures it
+already uses.
+
+`uasset.add_import` appends an `FObjectImport`, a 32-byte record of class
+package, class name, outer index and object name. `uasset.add_asset_reference`
+adds the pair that a reference needs, one entry for the package that holds the
+object and one for the object itself, reusing either if it is already present.
+Both return the new `FPackageIndex`, which is negative and counts from -1.
+
+Growing the table shifts everything after it, so the summary offsets, the total
+header size and every export's `SerialOffset` move by 32 bytes each time. The
+export payloads themselves are untouched, and because the header size and the
+serial offsets move together each export still resolves to the same bytes of
+the `.uexp`. The self-test grows all 1,790 data assets and checks that the
+exports still slice identically afterwards.
+
+`Project.set_reference` records one of these as a pending edit. It runs before
+value edits during a build, since the added imports change nothing in the
+payload but the header edits have to be applied in a fixed order.

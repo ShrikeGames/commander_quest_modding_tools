@@ -22,7 +22,9 @@ the others.
 """
 from __future__ import annotations
 import random
+import struct
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from . import decks
 
@@ -137,9 +139,10 @@ class Settings:
 def estimate_bytes(reader, assets, settings: Settings) -> int:
     """Roughly how large a mod these settings would produce.
 
-    Image categories dominate by orders of magnitude, because swapping an image
-    copies it rather than repointing a reference. Everything else edits a few
-    bytes of assets that are themselves small, so only the images are counted.
+    Image categories repoint a reference rather than copying an image, so their
+    cost is the rewritten header of each asset touched. Everything else edits a
+    few bytes of assets that are themselves small, so the estimate counts the
+    assets whose header has to be rebuilt.
 
     Args:
         reader (cqmod.pak.PakReader): An open archive.
@@ -149,18 +152,21 @@ def estimate_bytes(reader, assets, settings: Settings) -> int:
     Returns:
         int: Approximate uncompressed size in bytes.
     """
+    # Images are repointed rather than copied, so an image category now costs
+    # only the assets whose reference changes, not the pictures themselves.
     total = 0
-    groups = []
-    if settings.mode("card_art") != OFF:
-        groups.append([a for a in assets if a.class_name.startswith("CMCardData")])
-    if settings.mode("gear_icons") != OFF:
-        groups.append([a for a in assets if a.class_name == "CMGearDefinition"])
-    for group in groups:
-        for path in {a.texture for a in group if a.texture}:
-            for ext in (".uasset", ".uexp", ".ubulk"):
-                entry = reader.entries.get(path + ext)
-                if entry:
-                    total += entry.uncompressed_size
+    for a in assets:
+        edits_it = (
+            (settings.mode("card_art") != OFF
+             and a.class_name.startswith("CMCardData"))
+            or (settings.mode("gear_icons") != OFF
+                and a.class_name == "CMGearDefinition"))
+        if not edits_it or not a.texture:
+            continue
+        for ext in (".uasset", ".uexp"):
+            entry = reader.entries.get(a.path + ext)
+            if entry:
+                total += entry.uncompressed_size
     return total
 
 
@@ -349,11 +355,14 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
     mode = settings.mode("gear_icons")
     if mode != OFF:
         summary["gear_icons"] = _shuffle_textures(
-            _rng(settings, "gear_icons"), gears, project)
+            reader, um, _rng(settings, "gear_icons"), gears, project, "Icon")
 
     mode = settings.mode("card_art")
     if mode != OFF:
-        summary["card_art"] = _shuffle_art(_rng(settings, "card_art"), assets, project)
+        cards_for_art = [a for a in assets if a.class_name.startswith("CMCardData")]
+        summary["card_art"] = _shuffle_textures(
+            reader, um, _rng(settings, "card_art"), cards_for_art, project,
+            "CardIllustration")
 
     mode = settings.mode("starting_decks")
     if mode != OFF:
@@ -429,44 +438,91 @@ def _effect_numbers(reader, um, owners):
     return found
 
 
-def _shuffle_textures(rng, owners, project):
-    """Swap the images of a set of assets between them.
+def _find_reference(body: bytes, pkg, texture_path: str):
+    """Locate an object reference by the import it points at.
+
+    Property placement stops at the first variable-length property it cannot
+    measure, which on a summon card happens before the illustration. The
+    reference can still be found directly: an object property stores the
+    target's package index, so the payload is searched for that value. A match
+    is only accepted when it is unique, since a repeated value would make the
+    choice a guess.
 
     Args:
-        rng (random.Random): Generator for this category.
-        owners (list): Assets whose textures should be exchanged.
-        project (cqmod.project.Project): Project to stage edits into.
+        body (bytes): The asset's ``.uexp``.
+        pkg (cqmod.uasset.Package): Its parsed header.
+        texture_path (str): Pak path of the texture it currently uses.
 
     Returns:
-        int: How many assets had their image changed.
+        int | None: Byte offset of the reference, or None if it is not uniquely
+        identifiable.
     """
-    arts = sorted({a.texture for a in owners if a.texture})
-    if len(arts) < 2:
-        return 0
-    shuffled = list(arts)
-    rng.shuffle(shuffled)
-    n = 0
-    for target, source in zip(arts, shuffled):
-        if target == source:
+    name = Path(texture_path).name
+    index = None
+    for i, imp in enumerate(pkg.imports):
+        if imp.object_name == name and imp.class_name == "Texture2D":
+            index = -(i + 1)
+            break
+    if index is None:
+        return None
+    hits = [o for o in range(len(body) - 4)
+            if struct.unpack_from("<i", body, o)[0] == index]
+    return hits[0] if len(hits) == 1 else None
+
+
+def _shuffle_textures(reader, um, rng, owners, project, prop_name):
+    """Point a set of assets at each other's images.
+
+    This repoints references rather than copying pixels, so shuffling art costs
+    a few bytes per asset instead of duplicating every image. The target must be
+    added to each package's import table, which the build handles.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        um (cqmod.usmap.Usmap): Property schema.
+        rng (random.Random): Generator for this category.
+        owners (list): Assets whose images should be exchanged.
+        project (cqmod.project.Project): Project to stage edits into.
+        prop_name (str): The property holding the reference.
+
+    Returns:
+        int: How many assets were repointed.
+    """
+    from . import uasset
+
+    slots = []
+    for a in owners:
+        if not a.texture:
             continue
-        project.set_texture(target, source_texture=source)
+        try:
+            body = reader.read(a.uexp)
+            pkg = uasset.parse(reader.read(a.uasset))
+        except Exception:
+            continue
+        off = None
+        for e in a.exports:
+            for f in um.place(e, body):
+                if f.name == prop_name and f.offset >= 0:
+                    off = f.offset
+                    break
+            if off is not None:
+                break
+        if off is None:
+            off = _find_reference(body, pkg, a.texture)
+        if off is not None:
+            slots.append((a, off, a.texture))
+    if len(slots) < 2:
+        return 0
+    pool = [t for _, _, t in slots]
+    rng.shuffle(pool)
+    n = 0
+    for (a, off, old), target in zip(slots, pool):
+        if target == old:
+            continue
+        game_path = "/Game/" + target[len("Commander/Content/"):]
+        project.set_reference(a.path, off, game_path, "Texture2D", prop_name)
         n += 1
     return n
-
-
-def _shuffle_art(rng, assets, project):
-    """Swap card illustrations between cards.
-
-    Args:
-        rng (random.Random): Generator for this category.
-        assets (list): The catalog.
-        project (cqmod.project.Project): Project to stage edits into.
-
-    Returns:
-        int: How many cards had their art changed.
-    """
-    return _shuffle_textures(
-        rng, [a for a in assets if a.class_name.startswith("CMCardData")], project)
 
 
 def _random_decks(reader, rng, assets, project):

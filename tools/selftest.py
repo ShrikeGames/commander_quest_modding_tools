@@ -488,9 +488,34 @@ def main():
         art = randomizer.Settings(seed=5, choices={"card_art": "shuffle"})
         icon_size = randomizer.estimate_bytes(r, assets, icons)
         art_size = randomizer.estimate_bytes(r, assets, art)
-        check("the size estimate separates icons from card art",
-              0 < icon_size < art_size / 10,
-              f"icons {icon_size // 2**20} MB, card art {art_size // 2**20} MB")
+        # Shuffling art repoints each asset at an existing texture instead of
+        # copying pixels, so the cost follows the number of assets touched and
+        # not the size of the images. Copying card art used to run to roughly a
+        # gigabyte, and the ceiling here guards against that coming back.
+        check("shuffling art costs references, not images",
+              0 < icon_size < art_size < 20 * 2**20,
+              f"icons {icon_size / 2**20:.1f} MB, "
+              f"card art {art_size / 2**20:.1f} MB")
+
+        art_project = Project(name="Art")
+        art_count = randomizer.run(r, assets, um, art, art_project)["card_art"]
+        check("art shuffling reaches summon cards as well as supply cards",
+              any("Summon" in x.asset_path for x in art_project.references)
+              and any("Supply" in x.asset_path for x in art_project.references))
+        with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as fa:
+            fa.write(art_project.build(r))
+            art_pak = fa.name
+        ma = PakReader(art_pak)
+        landed = 0
+        for ref in art_project.references:
+            owner = by[Path(ref.asset_path).name]
+            index = struct.unpack_from("<i", ma.read(owner.uexp), ref.offset)[0]
+            landed += (uasset.parse(ma.read(owner.uasset)).resolve(index)
+                       == Path(ref.target).name)
+        ma.close(); Path(art_pak).unlink()
+        check("every repointed reference resolves to its new texture",
+              landed == len(art_project.references) == art_count,
+              f"{landed}/{len(art_project.references)}")
 
         # Range tiers are disjoint between melee and projectile attack types, so
         # randomizing must not move a unit between the two bands.
@@ -610,6 +635,53 @@ def main():
             check("the grown header stays self-consistent",
                   pk2.header_size == len(nh) and len(nx) == len(pay))
             m2.close(); Path(tmp2).unlink()
+
+    print("\nimport table insertion:")
+    grown_ok = grown_bad = 0
+    for path in data_assets:
+        raw3 = r.read(path)
+        try:
+            before3 = uasset.parse(raw3)
+            out3, index3 = uasset.add_asset_reference(
+                raw3, "/Game/SelfTest/T_Probe", "Texture2D")
+            after3 = uasset.parse(out3)
+        except Exception:
+            grown_bad += 1
+            continue
+        if (after3.resolve(index3) == "T_Probe"
+                and len(after3.imports) == len(before3.imports) + 2
+                and after3.header_size == len(out3)
+                and len(after3.exports) == len(before3.exports)
+                and all(b.uexp_slice(before3.header_size)
+                        == a3.uexp_slice(after3.header_size)
+                        for b, a3 in zip(before3.exports, after3.exports))):
+            grown_ok += 1
+        else:
+            grown_bad += 1
+    check("every data asset survives an import table insertion",
+          grown_bad == 0, f"{grown_ok}/{len(data_assets)}")
+
+    raw4 = r.read(data_assets[0])
+    out4, index4 = uasset.add_asset_reference(
+        raw4, "/Game/SelfTest/T_Probe", "Texture2D")
+    after4 = uasset.parse(out4)
+    check("the new import is the last one in the table",
+          index4 == -len(after4.imports))
+    check("its outer is the package that contains it",
+          after4.resolve(after4.imports[-1].outer_index)
+          == "/Game/SelfTest/T_Probe")
+    # Asking twice for the same asset must reuse both entries, or a package
+    # repointed at one texture from several properties would collect duplicates.
+    out5, index5 = uasset.add_asset_reference(
+        out4, "/Game/SelfTest/T_Probe", "Texture2D")
+    check("asking for the same asset twice reuses its imports",
+          out5 == out4 and index5 == index4)
+    # A different asset is a different package, so it costs a fresh pair.
+    out6, index6 = uasset.add_asset_reference(
+        out4, "/Game/SelfTest/T_Other", "Texture2D")
+    check("a different asset gets its own package and object entries",
+          len(uasset.parse(out6).imports) == len(after4.imports) + 2
+          and uasset.parse(out6).resolve(index6) == "T_Other")
 
     m.close(); Path(tmp).unlink()
     r.close()

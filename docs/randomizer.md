@@ -38,10 +38,10 @@ should be less reasonable.
 | Card effect numbers | shuffle, random | integers inside card effects, such as cards drawn or damage dealt |
 | Relic effect numbers | shuffle, random | the same for relics: resource amounts, trigger counts, buff values |
 | Relic rarity | shuffle | changes what turns up in shops and rewards |
-| Relic icons | shuffle | cosmetic, and cheap at about 34 MB |
+| Relic icons | shuffle | cosmetic, and cheap: the reference moves, not the image |
 | Commander starting decks | random | ten cards drawn from the whole pool |
 | Unit tags | shuffle | gameplay tags redistributed between units that have them |
-| Card art | shuffle | cosmetic, but see the size warning below |
+| Card art | shuffle | cosmetic, and likewise repointed rather than copied |
 
 Relics are `CMGearDefinition` in the data. Their effects are separate exports
 just as cards' are, so the same numeric knobs are reachable: 151 relics carry
@@ -69,18 +69,30 @@ Commander units are excluded unless **Include commanders** is ticked. Rolling a
 commander's health down to a few points makes a run unwinnable rather than
 interesting. Commander *cards* are ordinary cards and are randomized normally.
 
-## Image categories cost space
+## Image categories repoint rather than copy
 
-Swapping an image copies it, because pointing a card at another card's
-illustration would need a reference change that is not supported yet. The two
-image categories are therefore very different in cost:
+Swapping an image changes which texture the card points at instead of copying
+pixels into the mod. A card holds its illustration as an object reference, and
+`cqmod/uasset.py` can grow a package's import table, so the reference can be
+aimed at a texture the card never mentioned. The mod then carries a rewritten
+header of a couple of kilobytes in place of a multi-megabyte image.
 
-| category | added size |
-|---|---|
-| Relic icons | about 34 MB |
-| Card art | about 1 GB |
+| category | swaps | added size |
+|---|---|---|
+| Relic icons | 151 | about 0.3 MB |
+| Card art | 663 | about 2.7 MB |
 
-The tab estimates this live as you tick categories, so the cost is visible
-before you generate rather than after the build. Card art is off by default.
+The tab estimates this live as you tick categories. Both image categories are
+now cheap enough to leave on, and everything else together is around 1,200
+edits, so a full run builds in a second or two.
 
-Everything else together is around 1,200 edits and builds in a second or two.
+## Finding the reference
+
+Property placement walks an export's properties in order and stops at the first
+one whose length it cannot measure, which on a summon card comes before the
+illustration. When placement cannot reach the property, the reference is found
+by what it points at instead: the texture's entry in the import table has a
+known package index, and the payload is searched for that value. A match counts
+only when it is unique, so a repeated value is left alone rather than guessed
+at. The two methods together reach 663 of the game's cards where placement
+alone reached 61.

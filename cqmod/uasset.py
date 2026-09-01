@@ -362,17 +362,22 @@ def add_name(data: bytes, new_name: str) -> bytes:
         bytes: A rebuilt ``.uasset`` whose last name is ``new_name``.
 
     Raises:
-        AssetError: If the name is already present, the summary cannot be fully
-            parsed, or the package uses features this does not handle.
+        AssetError: If the name is already present, the summary cannot be
+            fully parsed, or the package uses features this does not handle.
     """
     pkg = parse(data)
     if new_name in pkg.names:
         raise AssetError(f"{new_name!r} is already in the name table")
-    if any(ord(c) > 127 for c in new_name):
-        raise AssetError("only ASCII names are supported")
-
     s = _summary_end(data)
-    entry = struct.pack("<i", len(new_name) + 1) + new_name.encode("ascii") + b"\0"
+    # A name entry is an FString: a positive length counts ANSI bytes, a
+    # negative one counts UTF-16 characters. A few asset names carry accented
+    # letters, so anything outside ASCII has to take the wide form.
+    if any(ord(c) > 127 for c in new_name):
+        entry = (struct.pack("<i", -(len(new_name) + 1))
+                 + new_name.encode("utf-16-le") + b"\0\0")
+    else:
+        entry = (struct.pack("<i", len(new_name) + 1)
+                 + new_name.encode("ascii") + b"\0")
     entry += b"\0" * 4                              # the two name hashes
     delta = len(entry)
 
@@ -445,3 +450,123 @@ def resize_export(data: bytes, export_index: int, delta: int) -> bytes:
         if v > 0:
             struct.pack_into("<q", out, p, v + delta)
     return bytes(out)
+
+
+def _shift_offsets(data: bytes, out: bytearray, summary: dict, threshold: int,
+                   delta: int) -> None:
+    """Move every summary offset that points past a growth point.
+
+    Args:
+        data (bytes): The original header, read for the old values.
+        out (bytearray): The header being rewritten.
+        summary (dict): Output of :func:`_summary_end`.
+        threshold (int): Offsets greater than this have moved.
+        delta (int): Bytes inserted.
+    """
+    for p in summary["shift32"]:
+        v = struct.unpack_from("<i", data, p)[0]
+        if v > threshold:
+            struct.pack_into("<i", out, p, v + delta)
+    for p in summary["shift64"]:
+        v = struct.unpack_from("<q", data, p)[0]
+        if v > threshold:
+            struct.pack_into("<q", out, p, v + delta)
+
+
+def add_import(data: bytes, class_package: str, class_name: str,
+               object_name: str, outer_index: int = 0):
+    """Append an entry to a package's import table.
+
+    An object reference is a package index, so pointing one at something the
+    asset has never referenced requires that thing to exist in the import table
+    first. Any names the entry needs are added to the name table beforehand,
+    which itself shifts the import table, so the header is re-read in between.
+
+    Args:
+        data (bytes): The original ``.uasset``.
+        class_package (str): Package declaring the class, e.g. ``/Script/Engine``.
+        class_name (str): Class of the referenced object, e.g. ``Texture2D``.
+        object_name (str): Name of the referenced object.
+        outer_index (int): ``FPackageIndex`` of the containing object, 0 for none.
+
+    Returns:
+        tuple[bytes, int]: The rebuilt ``.uasset`` and the new import's
+        ``FPackageIndex``, which is negative.
+
+    Raises:
+        AssetError: If the header cannot be parsed.
+    """
+    for name in (class_package, class_name, object_name):
+        if name not in parse(data).names:
+            data = add_name(data, name)
+
+    pkg = parse(data)
+    s = _summary_end(data)
+    import_count = len(pkg.imports)
+    import_off = struct.unpack_from("<i", data, s["export_count_pos"] + 12)[0]
+    table_end = import_off + import_count * IMPORT_STRIDE
+
+    names = pkg.names
+    entry = struct.pack(
+        "<IIIIiIII",
+        names.index(class_package), 0,
+        names.index(class_name), 0,
+        outer_index,
+        names.index(object_name), 0,
+        0,                                  # bImportOptional, always false here
+    )
+    assert len(entry) == IMPORT_STRIDE
+
+    out = bytearray(data[:table_end]) + entry + data[table_end:]
+    struct.pack_into("<i", out, s["export_count_pos"] + 8, import_count + 1)
+    struct.pack_into("<i", out, s["total_header_pos"],
+                     struct.unpack_from("<i", data, s["total_header_pos"])[0]
+                     + IMPORT_STRIDE)
+    _shift_offsets(data, out, s, table_end - 1, IMPORT_STRIDE)
+
+    # Export payloads do not move, but their offsets are measured from the start
+    # of the package, so they follow the header's growth.
+    export_offset = struct.unpack_from("<i", out, s["export_count_pos"] + 4)[0]
+    for k in range(s["export_count"]):
+        p = export_offset + k * EXPORT_STRIDE + 36
+        struct.pack_into("<q", out, p, struct.unpack_from("<q", out, p)[0]
+                         + IMPORT_STRIDE)
+    return bytes(out), -(import_count + 1)
+
+
+def add_asset_reference(data: bytes, game_path: str, class_name: str,
+                        class_package: str = "/Script/Engine"):
+    """Make a package able to refer to an asset it does not currently import.
+
+    Two entries are needed: one for the package that holds the object, and one
+    for the object itself, whose outer points at the first. Either may already
+    be present, in which case it is reused: a package that is asked for the
+    same asset twice should end up with one import, not a duplicate pair.
+
+    Args:
+        data (bytes): The original ``.uasset``.
+        game_path (str): Engine path of the target, e.g.
+            ``/Game/UI/ArtResources/Card/Human/T_Image_Card_X``.
+        class_name (str): Class of the target, e.g. ``Texture2D``.
+        class_package (str): Package declaring that class.
+
+    Returns:
+        tuple[bytes, int]: The rebuilt ``.uasset`` and the object's
+        ``FPackageIndex``.
+    """
+    object_name = game_path.rsplit("/", 1)[-1]
+    pkg = parse(data)
+    existing = None
+    for i, imp in enumerate(pkg.imports):
+        if imp.object_name == game_path and imp.class_name == "Package":
+            existing = -(i + 1)
+            break
+    if existing is None:
+        data, existing = add_import(data, "/Script/CoreUObject", "Package",
+                                    game_path, 0)
+    else:
+        for i, imp in enumerate(pkg.imports):
+            if (imp.object_name == object_name and imp.class_name == class_name
+                    and imp.outer_index == existing):
+                return data, -(i + 1)
+    return add_import(data, class_package, class_name, object_name, existing)

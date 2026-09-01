@@ -170,6 +170,30 @@ class AddPropertyEdit:
 
 
 @dataclass
+class ReferenceEdit:
+    """Point an object reference at a different asset.
+
+    An object property holds a package index, so aiming it somewhere new means
+    the target must exist in the importing package's import table. The build
+    adds it, which is what makes this cheaper than copying data: a card can use
+    another card's art without the image being duplicated.
+
+    Attributes:
+        asset_path (str): Pak path of the asset being edited.
+        offset (int): Byte offset of the reference in its ``.uexp``.
+        target (str): Engine path of the new target, e.g. ``/Game/UI/...``.
+        class_name (str): Class of the target, e.g. ``Texture2D``.
+        label (str): Property name, for the build log.
+    """
+
+    asset_path: str
+    offset: int
+    target: str
+    class_name: str = "Texture2D"
+    label: str = ""
+
+
+@dataclass
 class Project:
     """A named collection of staged edits.
 
@@ -186,6 +210,7 @@ class Project:
     values: list = field(default_factory=list)
     tags: list = field(default_factory=list)
     added: list = field(default_factory=list)
+    references: list = field(default_factory=list)
 
     def save(self, path) -> None:
         """Write the project to JSON.
@@ -200,6 +225,7 @@ class Project:
             "values": [asdict(v) for v in self.values],
             "tags": [asdict(t) for t in self.tags],
             "added": [asdict(x) for x in self.added],
+            "references": [asdict(x) for x in self.references],
         }, indent=1))
 
     @classmethod
@@ -220,6 +246,7 @@ class Project:
             values=[ValueEdit(**x) for x in d.get("values", [])],
             tags=[TagEdit(**x) for x in d.get("tags", [])],
             added=[AddPropertyEdit(**x) for x in d.get("added", [])],
+            references=[ReferenceEdit(**x) for x in d.get("references", [])],
         )
 
     @property
@@ -230,7 +257,7 @@ class Project:
             bool: True if there is nothing to build.
         """
         return not (self.texts or self.textures or self.values or self.tags
-                    or self.added)
+                    or self.added or self.references)
 
     def set_text(self, namespace, key, value, locale="en"):
         """Stage a text change, replacing any existing edit to the same key.
@@ -323,6 +350,24 @@ class Project:
         self.added.append(
             AddPropertyEdit(asset_path, export_index, prop_index, value, label))
 
+    def set_reference(self, asset_path, offset, target, class_name="Texture2D",
+                      label=""):
+        """Stage repointing an object reference, replacing any edit at the offset.
+
+        Args:
+            asset_path (str): Pak path of the asset being edited.
+            offset (int): Byte offset of the reference.
+            target (str): Engine path of the new target.
+            class_name (str): Class of the target.
+            label (str): Property name, for the build log.
+        """
+        for x in self.references:
+            if (x.asset_path, x.offset) == (asset_path, offset):
+                x.target, x.class_name, x.label = target, class_name, label
+                return
+        self.references.append(
+            ReferenceEdit(asset_path, offset, target, class_name, label))
+
     def clear_asset(self, asset_path):
         """Drop every staged value edit for one asset.
 
@@ -368,7 +413,8 @@ class Project:
         # resulting index is then written into the payload.
         touched = ({v.asset_path for v in self.values}
                    | {t.asset_path for t in self.tags}
-                   | {x.asset_path for x in self.added})
+                   | {x.asset_path for x in self.added}
+                   | {x.asset_path for x in self.references})
         um = None
         if self.added:
             um = usmap.Usmap.load()
@@ -433,6 +479,16 @@ class Project:
                 say(f"  name   {Path(asset).name} @{t.offset} = {t.tag}")
 
             widths = _value_widths(reader, asset, bytes(payload_ba)) if self.values else {}
+            for x in [y for y in self.references if y.asset_path == asset]:
+                header, index = uasset.add_asset_reference(
+                    header, x.target, x.class_name)
+                off = moved(x.offset)
+                if not (0 <= off <= len(payload_ba) - 4):
+                    raise ValueError(f"{asset}: reference offset {off} outside .uexp")
+                struct.pack_into("<i", payload_ba, off, index)
+                say(f"  ref    {Path(asset).name} {x.label or off} -> "
+                    f"{x.target.rsplit('/', 1)[-1]}")
+
             for v in [x for x in self.values if x.asset_path == asset]:
                 off = moved(v.offset)
                 # A value is written at the width its property actually uses:

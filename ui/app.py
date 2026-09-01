@@ -403,8 +403,6 @@ class MainWindow(QMainWindow):
         for r, c in enumerate(randomizer.CATEGORIES):
             box = QTableWidgetItem(c.label)
             box.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            # Art shuffling copies pixels rather than repointing a reference, so
-            # it is off by default: it alone turns a 1 MB mod into a 1 GB one.
             box.setCheckState(Qt.Unchecked)
             self.rando_table.setItem(r, 0, box)
             combo = QComboBox()
@@ -480,14 +478,13 @@ class MainWindow(QMainWindow):
             size = randomizer.estimate_bytes(self.reader, self.assets,
                                              self._rando_settings())
             if size:
-                note += f"  Roughly <b>{size / 2**20:.0f} MB</b>."
+                note += f"  Roughly <b>{size / 2**20:.1f} MB</b>."
             else:
                 note += "  Around a megabyte."
-        if "card_art" in chosen:
-            note += ("  Swapping images copies them, because pointing a card at "
-                     "another card's art needs a reference change that is not "
-                     "supported yet, so card art alone makes the build take "
-                     "minutes.")
+        if chosen.keys() & {"card_art", "gear_icons"}:
+            note += ("  Image categories repoint each asset at an existing "
+                     "texture instead of copying it, so they cost a rewritten "
+                     "header rather than a picture.")
         self.rando_note.setText(note)
 
     def _rando_generate(self):
