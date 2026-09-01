@@ -93,6 +93,46 @@ class is not named after its package, so the animation blueprint at
 `ABP_Human_Assassin_C`, and `add_asset_reference` grew an explicit object name
 for that case.
 
+## Descriptions follow the numbers
+
+A card's text spells its numbers out rather than reading them from the data, so
+randomizing an effect used to leave the card promising something it no longer
+did. Nothing can be recomputed from the text, so the old number is found in it
+and replaced with the new one.
+
+This covers cards, relics and quests, whose wording lives in one description,
+and events, whose wording is spread over pages and buttons. The keys are read
+out of each asset's own payload, so an event's pages are found without knowing
+how events are laid out. Every shipped language is rewritten, since the wording
+differs between them but the digits do not, and upgraded cards mark their
+improved numbers as `{{5}}`, which substituting the digits leaves intact.
+
+### Only where the answer is certain
+
+A number is rewritten when the old value appears exactly once across the asset's
+whole text, and when only one changed property held that value. Three cases are
+therefore skipped:
+
+- the value appears more than once, so there is no telling which mention it is
+- two changed properties shared the old value, so there is no telling which the
+  text is about
+- **two assets share the string.** The Neutral and Enemy versions of Arrow Rain
+  use one description, and once their damage is randomized apart no wording
+  suits both, so whichever was written last would leave the other lying.
+
+A description that is out of date is a smaller problem than one that is
+confidently wrong, so an uncertain case is left alone. In a full run that is
+167 of the roughly 200 texts whose numbers moved.
+
+### One fix this needed
+
+Identical strings are stored once in a `.locres` and shared by every key that
+uses them. Editing one key splits the entry so the others keep their text, but
+`locres.save` rebuilt only the string array and copied the key table verbatim,
+which threw the split away: the edit was written and then silently pointed
+past. The index each key resolves to is now written back too, so a split
+survives. An unedited resource still round-trips byte-identically.
+
 ## Quests and events
 
 Quests are `CMQuestDefinition` and map events are `CMInteractionEventDefinition`.

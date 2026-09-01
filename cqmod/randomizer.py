@@ -22,11 +22,13 @@ the others.
 """
 from __future__ import annotations
 import random
+import re
 import struct
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import decks, uasset
+from . import decks, ftext, locres, uasset
 
 SHUFFLE = "shuffle"
 RANDOM = "random"
@@ -265,7 +267,134 @@ def _collect(reader, um, assets, prop_name, predicate=None):
     return found
 
 
-def _apply(project, rng, mode, found, settings, low=None, high=None):
+GAME_LOCALES = ("en", "de", "ja", "ko", "ru", "zh-Hans")
+"""Languages the game ships card and relic text in.
+
+A description's wording differs by language but its numbers do not, so the same
+substitution applies to every one of them.
+"""
+
+LOCRES_PATH = "Commander/Content/Localization/Game/{locale}/Game.locres"
+
+
+def _standalone(value: int):
+    """Match a number only where it is not part of a longer one.
+
+    Args:
+        value (int): The number to look for.
+
+    Returns:
+        re.Pattern: A pattern matching ``value`` with no digit either side, so
+        looking for 2 does not match the 2 in 25 or in 12.
+    """
+    return re.compile(r"(?<!\d)%d(?!\d)" % value)
+
+
+def _text_keys(reader, asset) -> list:
+    """List every localized string an asset refers to.
+
+    A card keeps its wording in one description, but an event spreads it over
+    pages and buttons, each its own key. The keys are read out of the asset's
+    own payload, so whatever it references is found without needing to know how
+    that kind of asset is laid out.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        asset (cqmod.catalog.Asset): The asset to inspect.
+
+    Returns:
+        list[str]: Locres keys, in the order they appear.
+    """
+    keys = [asset.desc_key] if asset.desc_key else []
+    try:
+        body = reader.read(asset.uexp)
+    except Exception:
+        return keys
+    for span in ftext.find_all(body, [""] * 65536):
+        if span.key and span.key not in keys:
+            keys.append(span.key)
+    return keys
+
+
+def _restate_descriptions(reader, project, changes):
+    """Rewrite the numbers in descriptions to match the values behind them.
+
+    Card and relic text spells its numbers out, so randomizing an effect leaves
+    a card promising something it no longer does. The text is not generated from
+    the data, so there is nothing to recompute: the old number is found in the
+    description and replaced with the new one.
+
+    This only rewrites where the answer is certain. A number is replaced when
+    the old value appears exactly once in that description, and when only one
+    changed property had that value. A card whose description says 2 twice, or
+    whose two effects were both 2, is left alone: a description that is out of
+    date is a smaller problem than one that is confidently wrong.
+
+    Upgraded cards mark their improved numbers as ``{{5}}``, and substituting
+    the digits inside leaves that markup intact.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        project (cqmod.project.Project): Project to add edits to.
+        changes (dict): Pak path to ``(asset, [(old value, new value)])``.
+
+    Returns:
+        int: How many descriptions were rewritten. Each is counted once however
+        many languages it was rewritten in.
+    """
+    wanted = {}
+    for asset, pairs in changes.values():
+        if not asset.namespace:
+            continue
+        counts = Counter(old for old, _ in pairs)
+        # An old value shared by two changed properties gives no way to tell
+        # which of them the text is talking about.
+        unique = {old: new for old, new in pairs if counts[old] == 1}
+        if unique:
+            wanted[asset.path] = (asset, unique, _text_keys(reader, asset))
+    if not wanted:
+        return 0
+
+    # Two assets can share one string. The Neutral and Enemy versions of a card
+    # use the same description, and once their numbers are randomized apart
+    # there is no wording that suits both, so whichever was written last would
+    # leave the other describing something it does not do. Shared text is left
+    # alone instead.
+    claims = Counter()
+    for asset, _, keys in wanted.values():
+        for key in keys:
+            claims[(asset.namespace, key)] += 1
+
+    done = set()
+    for locale in GAME_LOCALES:
+        try:
+            loc = locres.load(reader.read(LOCRES_PATH.format(locale=locale)))
+        except Exception:
+            continue
+        for asset, pairs, keys in wanted.values():
+            mine = [k for k in keys if claims[(asset.namespace, k)] == 1]
+            texts = {k: loc.get(asset.namespace, k) for k in mine}
+            texts = {k: v for k, v in texts.items() if v}
+            updated = dict(texts)
+            for old, new in pairs.items():
+                pattern = _standalone(old)
+                # The number has to appear once in the whole asset's text, not
+                # merely once in some string of it: two pages both saying "3"
+                # give no way to tell which one the value belongs to.
+                hits = [k for k, v in updated.items()
+                        if len(pattern.findall(v)) == 1]
+                total = sum(len(pattern.findall(v)) for v in updated.values())
+                if len(hits) == 1 and total == 1:
+                    updated[hits[0]] = pattern.sub(str(new), updated[hits[0]])
+            for k, v in updated.items():
+                if v != texts[k]:
+                    project.set_text(asset.namespace, k, v, locale)
+                    done.add((asset.namespace, k))
+    return len(done)
+
+
+def _apply(project, rng, mode, found, settings, low=None, high=None,
+           record=None):
     """Stage new values for a set of collected fields.
 
     Args:
@@ -277,6 +406,9 @@ def _apply(project, rng, mode, found, settings, low=None, high=None):
         low (int | None): Lower bound for rolls, defaulting to the observed
             minimum.
         high (int | None): Upper bound, defaulting to the observed maximum.
+        record (dict | None): If given, each change is noted as
+            ``path -> (asset, [(old, new)])`` so descriptions can be brought in
+            line afterwards.
 
     Returns:
         int: How many edits were staged.
@@ -304,6 +436,8 @@ def _apply(project, rng, mode, found, settings, low=None, high=None):
         if value == old:
             continue
         project.set_value(a.path, off, value, a.name)
+        if record is not None:
+            record.setdefault(a.path, (a, []))[1].append((old, value))
         n += 1
     return n
 
@@ -323,6 +457,11 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
     """
     summary = {}
     units = _units(assets, settings)
+    # Descriptions spell their numbers out, so an effect that changes leaves the
+    # card, relic or quest describing what it used to do. Every category that
+    # moves such a number records it here, and the text is rewritten once at the
+    # end from the whole collection.
+    reworded = {}
 
     mode = settings.mode("unit_health")
     if mode != OFF:
@@ -366,7 +505,8 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
                        key=lambda a: a.name)
         found = _effect_numbers(reader, um, cards)
         summary["effect_values"] = _apply(project, _rng(settings, "effect_values"),
-                                          mode, found, settings, low=1)
+                                          mode, found, settings, low=1,
+                                          record=reworded)
 
     gears = sorted((a for a in assets if a.class_name == "CMGearDefinition"),
                    key=lambda a: a.name)
@@ -375,7 +515,7 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
     if mode != OFF:
         summary["gear_values"] = _apply(project, _rng(settings, "gear_values"),
                                         mode, _effect_numbers(reader, um, gears),
-                                        settings, low=1)
+                                        settings, low=1, record=reworded)
 
     mode = settings.mode("gear_rarity")
     if mode != OFF:
@@ -425,7 +565,8 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
     if mode != OFF:
         summary["quest_conditions"] = _apply_groups(
             project, _rng(settings, "quest_conditions"), mode,
-            _quantities(reader, um, quests, "QuestCompleteCondition"), settings)
+            _quantities(reader, um, quests, "QuestCompleteCondition"), settings,
+            record=reworded)
 
     mode = settings.mode("quest_rewards")
     if mode != OFF:
@@ -436,7 +577,8 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
     if mode != OFF:
         summary["event_values"] = _apply_groups(
             project, _rng(settings, "event_values"), mode,
-            _quantities(reader, um, events, "CMEventActionParameter"), settings)
+            _quantities(reader, um, events, "CMEventActionParameter"), settings,
+            record=reworded)
 
     mode = settings.mode("event_health")
     if mode != OFF:
@@ -449,6 +591,13 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
         summary["event_gear_rarity"] = _apply(
             project, _rng(settings, "event_gear_rarity"), SHUFFLE,
             _collect(reader, um, events, "GearRarity"), settings)
+
+    # Runs last, because every category that changes a number a description
+    # quotes feeds the same record.
+    if reworded:
+        wrote = _restate_descriptions(reader, project, reworded)
+        if wrote:
+            summary["descriptions"] = wrote
 
     return summary
 
@@ -524,7 +673,7 @@ def _quantities(reader, um, owners, class_prefix):
     return groups
 
 
-def _apply_groups(project, rng, mode, groups, settings):
+def _apply_groups(project, rng, mode, groups, settings, record=None):
     """Stage edits for each pool of a grouped collection separately.
 
     Args:
@@ -533,11 +682,14 @@ def _apply_groups(project, rng, mode, groups, settings):
         mode (str): ``shuffle`` or ``random``.
         groups (dict): Output of :func:`_quantities`.
         settings (Settings): Run settings, for variance.
+        record (dict | None): Passed through so descriptions can be brought in
+            line with the numbers behind them.
 
     Returns:
         int: How many edits were staged across all pools.
     """
-    return sum(_apply(project, rng, mode, groups[k], settings, low=1)
+    return sum(_apply(project, rng, mode, groups[k], settings, low=1,
+                      record=record)
                for k in sorted(groups))
 
 

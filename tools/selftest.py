@@ -6,7 +6,8 @@ packages carry a magic and a header size, and locres/texture writers are checked
 by round-tripping. Run this after changing anything in cqmod/.
 """
 from __future__ import annotations
-import io, os, struct, subprocess, sys, tempfile, time
+import io, os, re, struct, subprocess, sys, tempfile, time
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -609,6 +610,95 @@ def main():
               melee and ranged and not (melee & ranged),
               f"melee {sorted(melee)}, ranged {sorted(ranged)}")
         m6.close(); Path(tmp6).unlink()
+
+    print("\ndescriptions follow the numbers:")
+    rp9 = Project(name="Reworded")
+    sm9 = randomizer.run(
+        r, assets, um,
+        randomizer.Settings(seed=4, choices={"effect_values": "random",
+                                             "gear_values": "random",
+                                             "quest_conditions": "random",
+                                             "event_values": "random"}), rp9)
+    check("rewording happens at all", sm9.get("descriptions", 0) > 100,
+          str(sm9))
+
+    named = {(a.namespace, a.desc_key): a for a in assets
+             if a.namespace and a.desc_key}
+    english = [t for t in rp9.texts if t.locale == "en"]
+    kinds = {named[(t.namespace, t.key)].class_name
+             for t in english if (t.namespace, t.key) in named}
+    check("cards, relics and quests are all reworded",
+          {"CMGearDefinition", "CMQuestDefinition"} <= kinds
+          and any(k.startswith("CMCardData") for k in kinds), str(sorted(kinds)))
+    check("every language is reworded, not just English",
+          {t.locale for t in rp9.texts} == set(randomizer.GAME_LOCALES),
+          str(sorted({t.locale for t in rp9.texts})))
+
+    # The number written into the text must be one actually written into the
+    # asset, or the card is now lying in a new way rather than the old one.
+    staged = {}
+    for v in rp9.values:
+        staged.setdefault(v.asset_path, set()).add(v.value)
+    agree = wrong = 0
+    for t in english:
+        a9 = named.get((t.namespace, t.key))
+        if not a9 or not a9.description:
+            continue
+        before = {int(x) for x in re.findall(r"\d+", a9.description)}
+        after = {int(x) for x in re.findall(r"\d+", t.value)}
+        fresh = after - before
+        if not fresh or fresh & staged.get(a9.path, set()):
+            agree += 1
+        else:
+            wrong += 1
+    check("a reworded number is one the asset really got",
+          wrong == 0, f"{agree} agree, {wrong} wrong")
+
+    # A description saying the same number twice gives no way to tell which
+    # effect it refers to, so it is left alone rather than guessed at.
+    twice = {"x": (type("A", (), {"namespace": "NS", "desc_key": "K",
+                                  "path": "p", "uexp": "nope"})(),
+                   [(2, 9)])}
+    quiet = Project(name="Quiet")
+
+    class OneText:
+        """Stands in for a resource whose text mentions 2 twice."""
+
+        def get(self, ns, key):
+            """Return the same ambiguous string for any key."""
+            return "Deal 2 damage 2 times."
+
+        def set(self, *a):
+            """Unused; edits are staged on the project instead."""
+
+    import cqmod.locres as _lr
+    real_load, real_read = _lr.load, r.read
+    _lr.load = lambda raw: OneText()
+    r.read = lambda p: b""
+    try:
+        randomizer._restate_descriptions(r, quiet, twice)
+    finally:
+        _lr.load, r.read = real_load, real_read
+    check("an ambiguous number is left alone", not quiet.texts,
+          str([t.value for t in quiet.texts]))
+
+    # Identical strings are shared in a locres, so editing one key has to split
+    # the entry and the split has to survive being written out.
+    raw9 = r.read(randomizer.LOCRES_PATH.format(locale="en"))
+    loc9 = locres.load(raw9)
+    check("an unedited resource round-trips byte-identically",
+          locres.save(loc9) == raw9)
+    shared_at = Counter(loc9.entries.values())
+    pair = next((k for k, v in loc9.entries.items() if shared_at[v] > 1), None)
+    if pair:
+        other = next(k for k, v in loc9.entries.items()
+                     if v == loc9.entries[pair] and k != pair)
+        loc9.set(pair[0], pair[1], "FIRST")
+        loc9.set(other[0], other[1], "SECOND")
+        back = locres.load(locres.save(loc9))
+        check("two keys sharing a string can be edited apart",
+              (back.get(*pair), back.get(*other)) == ("FIRST", "SECOND"),
+              f"{back.get(*pair)!r} / {back.get(*other)!r}")
 
     print("\nquests and events:")
     quest_keys = ("quest_rarity", "quest_conditions", "quest_rewards")

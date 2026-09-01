@@ -40,6 +40,9 @@ class Locres:
             edit text in place.
         entries (dict): ``(namespace, key) -> index`` into :attr:`strings`.
             Several keys may share an index, since identical text is deduplicated.
+        index_positions (dict): ``(namespace, key) -> byte offset`` of that
+            key's index within the namespace table, so a key can be repointed
+            without rebuilding the table.
     """
 
     version: int
@@ -47,6 +50,7 @@ class Locres:
     array_offset: int
     strings: list = field(default_factory=list)
     entries: dict = field(default_factory=dict)
+    index_positions: dict = field(default_factory=dict)
 
     def get(self, namespace: str, key: str):
         """Look up a localized string.
@@ -162,6 +166,7 @@ def load(raw: bytes) -> Locres:
     o = _HEADER_SIZE + 4
     (ns_count,) = struct.unpack_from("<I", raw, o); o += 4
     entries = {}
+    positions = {}
     for _ in range(ns_count):
         o += 4
         ns, o = _rd_string(raw, o)
@@ -170,17 +175,25 @@ def load(raw: bytes) -> Locres:
             o += 4
             key, o = _rd_string(raw, o)
             o += 4
-            (idx,) = struct.unpack_from("<i", raw, o); o += 4
+            (idx,) = struct.unpack_from("<i", raw, o)
             entries[(ns, key)] = idx
-    return Locres(version, raw, array_offset, strings, entries)
+            positions[(ns, key)] = o
+            o += 4
+    return Locres(version, raw, array_offset, strings, entries, positions)
 
 
 def save(loc: Locres) -> bytes:
     """Serialize a resource back to bytes.
 
-    Only the trailing string array is rebuilt; everything before it is copied
-    verbatim from the original. That keeps the recorded array offset correct and
-    guarantees an unedited resource round-trips byte-identically.
+    The trailing string array is rebuilt and everything before it is copied
+    verbatim, which keeps the recorded array offset correct and guarantees an
+    unedited resource round-trips byte-identically.
+
+    One field in the copied part does change. Each key records which string it
+    resolves to, and :meth:`Locres.set` repoints a key when it has to split a
+    string shared with others. Copying the table wholesale would throw that
+    repointing away and the edit would silently not appear, so those indices are
+    written back at the offsets recorded when the file was read.
 
     Args:
         loc (Locres): The resource to write.
@@ -190,9 +203,11 @@ def save(loc: Locres) -> bytes:
 
     Note:
         This cannot *add* ``(namespace, key)`` pairs, only retarget existing
-        ones, because the namespace table is reused unchanged.
+        ones, because the namespace table is otherwise reused unchanged.
     """
     out = bytearray(loc.raw[:loc.array_offset])
+    for pair, at in loc.index_positions.items():
+        struct.pack_into("<i", out, at, loc.entries[pair])
     out += struct.pack("<i", len(loc.strings))
     for s, rc in loc.strings:
         out += _wr_string(s) + struct.pack("<i", rc)

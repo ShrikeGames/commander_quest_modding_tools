@@ -70,6 +70,17 @@ rather than being silently corrupted.
 Swapping art *between* existing assets has no such limit, since it repoints a
 reference and copies nothing.
 
+## Some descriptions cannot follow their numbers
+
+Randomizing an effect rewrites the text that quotes it, but only where the
+answer is certain: the old number must appear exactly once in the asset's text,
+only one changed property may have held it, and no other asset may share the
+string. Roughly one text in six is left saying the old number rather than being
+guessed at. See [the randomizer](randomizer.md).
+
+Event wording is the weakest case, because an amount often appears across
+several pages at once.
+
 ## New localization keys cannot be added
 
 `locres.save` rebuilds only the trailing string array and reuses the namespace
