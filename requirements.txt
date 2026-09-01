@@ -1,4 +1,10 @@
 cryptography>=41.0
 Pillow>=10.0
-PySide6>=6.5
+# Capped below 6.10 deliberately. From 6.10 the Windows wheels ship a
+# Qt6Core.dll that imports icuuc.dll without shipping it, expecting the copy
+# Windows has provided since version 1903. A packaged build then dies at
+# startup with "DLL load failed while importing QtCore" anywhere that copy is
+# absent, which includes Wine and older Windows. 6.9.2 carries no such
+# dependency, so the bundle stays self-contained.
+PySide6>=6.5,<6.10
 numpy>=1.24

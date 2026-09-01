@@ -57,14 +57,30 @@ UNUSED_QT = (
     "Qt6Designer", "Qt6Help", "Qt6Test", "Qt6Sql", "Qt6Multimedia",
     "Qt6Charts", "Qt6DataVisualization", "Qt6Bluetooth", "Qt6NetworkAuth",
     "Qt6Positioning", "Qt6SerialPort", "Qt6WebEngine", "Qt63D",
+    # Needs Qt Quick and QML, so it cannot stay once those are gone.
+    "Qt6VirtualKeyboard",
 )
-UNUSED_DIRS = ("PySide6/Qt/qml/", "PySide6/Qt/translations/",
-               "PySide6/Qt/plugins/sqldrivers/",
-               "PySide6/Qt/plugins/multimedia/")
+
+# Plugins whose only purpose is to front one of the modules above. Removing a
+# library and keeping the plugin that loads it leaves the bundle referring to
+# something it no longer ships.
+UNUSED_PLUGINS = ("qpdf.", "qtvirtualkeyboardplugin.", "qtvirtualkeyboard_")
+
+UNUSED_DIRS = ("PySide6/Qt/qml/", "PySide6/qml/",
+               "PySide6/Qt/translations/", "PySide6/translations/",
+               "PySide6/Qt/plugins/sqldrivers/", "PySide6/plugins/sqldrivers/",
+               "PySide6/Qt/plugins/multimedia/", "PySide6/plugins/multimedia/",
+               "PySide6/Qt/plugins/virtualkeyboard/",
+               "PySide6/plugins/virtualkeyboard/")
 
 
 def wanted(entry):
     """Test whether a collected file is worth shipping.
+
+    Matching is on the file's own name and anchored at its start. Testing the
+    whole path for a substring would drop anything that merely sat in a folder
+    with an unlucky name, and an over-eager filter here does not fail the
+    build: it produces a bundle that packages cleanly and then cannot start.
 
     Args:
         entry (tuple): A PyInstaller table row, whose first item is the
@@ -74,7 +90,13 @@ def wanted(entry):
         bool: False for Qt modules this application never loads.
     """
     dest = str(entry[0]).replace("\\", "/")
-    if any(part in dest for part in UNUSED_QT):
+    name = dest.rsplit("/", 1)[-1]
+    # The same Qt module is Qt6Quick.dll on Windows and libQt6Quick.so.6 on
+    # Linux, so the lib prefix comes off before matching.
+    stem = name[3:] if name.startswith("lib") else name
+    if any(stem.startswith(part) for part in UNUSED_QT):
+        return False
+    if any(name.lower().startswith(part) for part in UNUSED_PLUGINS):
         return False
     return not any(d in dest for d in UNUSED_DIRS)
 

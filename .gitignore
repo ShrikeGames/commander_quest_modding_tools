@@ -241,3 +241,6 @@ dist_app/
 
 # Logs pulled from CI for debugging
 logs/
+
+# Bundles downloaded from CI for inspection
+release_artifacts/

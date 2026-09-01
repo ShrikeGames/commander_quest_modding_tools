@@ -80,6 +80,30 @@ jobs:
       - name: Package the application
         run: pyinstaller --noconfirm packaging/cqmod.spec
 
+      # Packaging cleanly says nothing about whether the result starts. A
+      # bundle missing one DLL fails at launch naming the extension that could
+      # not load rather than the library that was absent, so the imports are
+      # audited here instead of on a user's machine.
+      - name: Audit bundled dependencies
+        if: matrix.label == 'windows'
+        id: audit
+        shell: bash
+        run: |
+          set -o pipefail
+          python tools/check_bundle.py dist/CommanderQuestModTool 2>&1 | tee audit.log
+
+      - name: Report the dependency audit
+        if: always() && matrix.label == 'windows' && steps.audit.outcome != 'skipped'
+        shell: bash
+        run: |
+          {
+            echo "## Windows dependency audit"
+            echo ''
+            echo '```'
+            tail -60 audit.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Add the readme users see first
         shell: bash
         run: cp packaging/README-package.txt dist/CommanderQuestModTool/README.txt

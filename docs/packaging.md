@@ -55,12 +55,60 @@ A build is around 213 MB unpacked, most of it Qt and numpy.
 Excluding a Qt module by import name is not enough, because PySide6's
 PyInstaller hook adds every Qt library and plugin as a *binary* rather than an
 import. Those survive the excludes and are filtered out of the collected lists
-in the spec instead. Dropping Qt Quick, QML and PDF, which a widgets
-application never loads, takes about 27 MB off.
+in the spec instead. Dropping Qt Quick, QML, PDF and the virtual keyboard,
+which a widgets application never loads, takes about 27 MB off.
+
+Matching is on the file's own name with any `lib` prefix removed, since the
+same module is `Qt6Quick.dll` on Windows and `libQt6Quick.so.6` on Linux, and
+anchored at the start: testing the whole path for a substring would drop
+anything that happened to sit in a folder with an unlucky name. An over-eager
+filter does not fail the build, it produces a bundle that packages cleanly and
+then cannot start, which is why the audit above exists.
 
 numpy stays. It is only used by `cqmod/dxt.py`, but that is real vectorised
 work on block-compressed textures, and replacing it would be both a rewrite and
 much slower.
+
+## PySide6 is capped below 6.10
+
+From 6.10 the Windows wheels ship a `Qt6Core.dll` that imports `icuuc.dll`
+without shipping it, expecting the copy Windows has provided since version
+1903. The Linux wheels bundle their own `libicuuc.so.73`, so only Windows is
+affected, and only away from a current Windows: on Wine or an older build the
+packaged application dies at startup with
+
+    ImportError: DLL load failed while importing QtCore: Module not found.
+
+which names the extension that failed to load rather than the library that was
+missing. Checking the wheels directly shows where it changed:
+
+| PySide6 | Windows `Qt6Core.dll` needs host ICU |
+|---|---|
+| 6.11.2 | yes |
+| 6.10.1 | yes |
+| 6.9.2 | no |
+| 6.8.3 | no |
+| 6.7.3 | no |
+
+`requirements.txt` therefore pins `PySide6<6.10`, which keeps the bundle
+self-contained.
+
+## Checking the bundle
+
+`tools/check_bundle.py` walks the import table of every DLL and extension in a
+packaged build and reports anything neither present alongside it nor part of
+Windows. The release workflow runs it and fails the build on a bad result, so
+a missing dependency is caught in CI rather than on a user's machine.
+
+It separates two cases, because they need different answers:
+
+- **unresolved imports**, which mean something was dropped that should not have
+  been. Trimming Qt found this: removing `Qt6Qml` and `Qt6Quick` while keeping
+  `Qt6VirtualKeyboard`, which loads them, left the bundle referring to
+  libraries it no longer shipped.
+- **host dependencies**, the ICU case above, where the file is genuinely
+  absent from the bundle by design and the build only works where the host
+  happens to supply it.
 
 ## Releasing
 
