@@ -26,13 +26,13 @@ game data.
 | | |
 |---|---|
 | [Architecture](architecture.md) | Module map and data flow |
-| [Property sizes](property-sizes.md) | Solving property layouts without a .usmap |
+| [Property sizes](property-sizes.md) | Solving the serialized sizes the schema does not record |
 | [Reverse engineering notes](reverse-engineering.md) | How the format was worked out |
 | [Pak archives](formats/pak.md) | UE pak v11, encryption, entry encoding |
 | [Packages](formats/package.md) | `.uasset` header, name/import/export tables |
-| [Unversioned properties](formats/unversioned.md) | Why property names are missing |
+| [Unversioned properties](formats/unversioned.md) | Why names are absent from the data, and how values are laid out |
 | [Localization](formats/locres.md) | `.locres`, and the ANSI/UTF-16 trap |
-| [Textures](formats/texture.md) | `PF_B8G8R8A8` card art |
+| [Textures](formats/texture.md) | Texture2D on disk: mip chains, bulk data, block formats |
 
 ## The short version
 
@@ -41,11 +41,17 @@ Three facts make modding this game practical:
 1. **Mod paks need neither the encryption key nor Oodle.** UE accepts an
    unencrypted index and uncompressed entries. Both are only needed to *read*
    the shipping archive.
-2. **Length-preserving edits need no export-table surgery.** Keep a patched
+2. **A length-preserving edit needs no export-table surgery.** Keep a patched
    `.uexp` the same byte length and its paired `.uasset` stays valid untouched.
-3. **Card art is uncompressed BGRA.** No BC7/DXT encoder required.
+   Edits that do change lengths, such as adding a property or an import, rewrite
+   the export table and shift the offsets that moved.
+3. **An asset can be pointed at something it never referenced.** Growing the
+   import table means swapping art or a unit's model costs a rewritten header
+   rather than a copy of the data.
 
-And one fact that limits them: packages are cooked with
-`PKG_UnversionedProperties`, so property *names and types* are not recoverable
-without a `.usmap`. Values are addressed by byte offset instead, and found by
+Packages are cooked with `PKG_UnversionedProperties`, so names and types are
+absent from the data itself. They are recovered from the running engine into
+[`schema/usmap.json`](property-names.md) instead. What remains is that walking an
+export stops at the first array or struct whose length cannot be measured, so
+numbers past that point are still found by
 [diffing a card against its upgrade variant](finding-fields.md).

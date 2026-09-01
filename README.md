@@ -127,15 +127,24 @@ Full docs are in [`docs/`](docs/index.md):
 ```
 cqmod/
   config.py       game paths + AES key (never committed)
+  resources.py    finding bundled files, from a checkout or a packaged build
+  keyfinder.py    recovering the pak key from the running game
   oodle.py        ctypes binding to the vendored Kraken decoder
   pak.py          PakReader (AES + Oodle) and build_pak (uncompressed, unencrypted)
-  uasset.py       package summary, name/import/export tables
+  uasset.py       package summary, name/import/export tables, and growing them
   unversioned.py  unversioned property headers
+  usmap.py        property names and types recovered from the engine
+  schema.py       solving serialized property sizes
+  payload.py      adding a property an export does not set
   ftext.py        string-table FText values
   locres.py       localization read/write
-  texture.py      PF_B8G8R8A8 art import/export
+  texture.py      Texture2D read/replace
+  dxt.py          DXT1 and DXT5 block compression
+  artchain.py     finding the texture that depicts a unit
+  decks.py        commander starting decks
   catalog.py      the asset index
   diff.py         variant comparison / field finder
+  randomizer.py   generating a randomized mod from the game's own data
   project.py      staged edits -> a mod pak
   mods.py         enable / disable installed mods
 third_party/ooz/  vendored Oodle Kraken decompressor (GPL-3.0)
@@ -146,32 +155,41 @@ Three facts make this tractable:
 1. **Mod paks need neither the AES key nor Oodle.** UE accepts an unencrypted index
    and uncompressed entries, so `build_pak` writes plain data. Decryption and Oodle
    are only needed to *read* the shipping pak.
-2. **Length-preserving edits need no export-table surgery.** If a patched `.uexp`
-   keeps its exact byte length, the paired `.uasset` stays valid untouched. Every
-   edit type here preserves length.
-3. **Card art is `PF_B8G8R8A8`**, uncompressed 32-bit BGRA with a single mip.
-   Custom art needs no BC7/DXT encoder.
+2. **Most edits preserve length, and the ones that do not are handled.** A patched
+   `.uexp` that keeps its exact byte length leaves the paired `.uasset` valid
+   untouched, which covers ordinary value and text edits. Adding a property,
+   a name or an import does change lengths, so those rewrite the export table and
+   shift every offset that moved.
+3. **An asset can be pointed at art it never referenced.** Growing the import
+   table means swapping a card's illustration costs a rewritten header rather
+   than a copy of the image, which is what makes randomizing art and unit models
+   cheap enough to be practical.
 
 ## Limitations
 
 See [docs/limitations.md](docs/limitations.md) for the full picture.
 
-**Adding genuinely new assets is not supported.** A new card needs a new `DT_Cards`
-row and a new asset, which changes byte lengths and therefore requires rewriting
-`.uasset` export tables with correct property serialization, which needs the class
-schema. Everything here edits existing assets instead.
+**Creating an asset from nothing is not supported.** Everything here edits assets
+the game already ships. Most of the pieces a new asset needs now exist, including
+the class schema, name and import insertion and export resizing, but not the step
+that ties them into a new package plus its `DT_Cards` row. Repurposing a card you
+do not mind losing is the practical route.
 
-**Property names are recovered, but placement stops at variable-length data.**
-`schema/usmap.json` restores real names and types from the running game, so the
-editor shows `Count (IntProperty)` rather than an offset. Placement still stops at
-the first array or struct it cannot measure, leaving the tail of a card unresolved.
-See [property names](docs/property-names.md).
+**Placement stops at the first unmeasurable property.** Names and types are
+recovered, so the editor shows `Count (IntProperty)` rather than an offset, but
+walking an export stops at the first array or struct whose length is unknown,
+leaving the tail unaddressed. Object references get around this by being found
+through the import they point at. See [property names](docs/property-names.md).
 
-**Only int32 values are editable.** Floats, enums, booleans and object references are
-visible in the raw view but have no dedicated editor yet.
+**Not every type has an editor.** Integers, enums, bytes and booleans are
+editable. Object references are shown read-only on purpose, since a hand-typed
+number would repoint them rather than change a value; the randomizer repoints
+them where that is meaningful. Floats have no editor yet, though the randomizer
+writes them.
 
-**Linux only** so far. The Oodle decoder builds with GCC, and the key finder reads
-`/proc/<pid>/mem`.
+**Replacement art keeps the original dimensions.** `PF_B8G8R8A8`, `PF_DXT1` and
+`PF_DXT5` are handled, mip chains included. Swapping art between existing assets
+has no such limit, because it repoints a reference instead of copying pixels.
 
 ## Licence
 

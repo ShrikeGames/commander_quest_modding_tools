@@ -7,7 +7,7 @@ Two kinds of texture exist in this game and they need different handling.
 
 | | format | where |
 |---|---|---|
-| Card art | `PF_B8G8R8A8`, single mip, no bulk file | card illustrations |
+| Card art | `PF_B8G8R8A8` (329 of 330), usually one mip | card illustrations |
 | Unit and world art | `PF_DXT1` (753) or `PF_DXT5` (122), full mip chain | models, tiles, effects |
 
 Both use the same mip chain layout, so both take the same path through the

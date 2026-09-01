@@ -5,20 +5,25 @@
 ```
 ui/app.py            PySide6 editor
       |
+cqmod/randomizer.py  a randomized mod from the game's own data
 cqmod/project.py     staged edits  ->  a mod pak
 cqmod/mods.py        enable / disable installed mods
-cqmod/catalog.py     the asset index
-cqmod/diff.py        variant comparison / field finder
+      |
+cqmod/catalog.py     the asset index      cqmod/decks.py     commander decks
+cqmod/diff.py        field finder         cqmod/artchain.py  unit -> its texture
 cqmod/schema.py      solved property sizes per class
 cqmod/usmap.py       recovered property names and types
       |
 cqmod/uasset.py      package headers      cqmod/locres.py    localization
-cqmod/unversioned.py property headers     cqmod/texture.py   card art
+cqmod/unversioned.py property headers     cqmod/texture.py   Texture2D
+cqmod/payload.py     adding a property    cqmod/dxt.py       BC1 / BC3
 cqmod/ftext.py       string-table text
       |
 cqmod/pak.py         archive read + write
-cqmod/oodle.py       Kraken decompression  ->  third_party/ooz/libooz.so
+cqmod/oodle.py       Kraken decompression  ->  native/libooz.so or .dll
+cqmod/keyfinder.py   pak key recovery      ->  native/aes_finder
 cqmod/config.py      game paths, AES key
+cqmod/resources.py   bundled files, from a checkout or a packaged build
 ```
 
 Each layer only depends on those below it. `pak.py` knows nothing about cards;

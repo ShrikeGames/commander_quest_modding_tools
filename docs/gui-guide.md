@@ -43,8 +43,10 @@ Displays the card art, its dimensions and pixel format.
 - *Export PNG…* writes the current art out, which is the easy way to get a base
   to paint over.
 
-Staged replacements are noted under the preview. Assets whose art is not
-`PF_B8G8R8A8` report why they cannot be shown rather than failing silently.
+Staged replacements are noted under the preview. Uncompressed and
+block-compressed art both display, so unit models preview as readily as card
+illustrations. Anything that still cannot be decoded, such as a cube map, says
+why rather than failing silently.
 
 ## Values tab
 

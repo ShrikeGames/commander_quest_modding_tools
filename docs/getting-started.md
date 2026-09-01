@@ -1,27 +1,33 @@
 # Getting started
 
+## Just want to use it?
+
+Take the build for your platform from
+[Releases](https://github.com/ShrikeGames/commander_quest_modding_tools/releases),
+unpack it anywhere, and run it. No Python, no compiler, nothing installed, and
+the first-run dialog handles everything below. The rest of this page is for
+working from a checkout.
+
 ## Requirements
 
-- Linux (the Oodle decoder builds with GCC; the key finder reads `/proc`)
+- Windows or Linux
 - Python 3.10+
-- A build toolchain for the vendored decoder and the key scanner
+- A C and C++ compiler, for the decoder and the key scanner
 
 ```bash
-pip install -r requirements.txt            # cryptography, Pillow, PySide6
-sudo apt install build-essential libssl-dev
+pip install -r requirements.txt   # cryptography, Pillow, PySide6, numpy
+python3 tools/build_native.py     # libooz and aes_finder, into native/
 ```
 
-Native code is built automatically on first use, but you can do it up front:
-
-```bash
-make -C third_party/ooz      # libooz.so, the Oodle Kraken decoder
-make -C tools/aes_finder     # the AES key scanner
-```
+`tools/build_native.py` needs nothing but a compiler: the key scanner carries
+its own AES rather than linking OpenSSL, and neither piece needs `make`. On
+Debian or Ubuntu, `sudo apt install build-essential` is enough.
 
 ## Configuration
 
-Settings live in `cqmod_config.local.json` beside the repository root. It is
-gitignored, because it holds a key specific to your copy of the game.
+Settings live in `cqmod_config.local.json` beside the program, which from a
+checkout means the repository root. It is gitignored, because it holds a key
+specific to your copy of the game.
 
 ```json
 {
@@ -32,7 +38,8 @@ gitignored, because it holds a key specific to your copy of the game.
 ```
 
 `game_dir` defaults to the repository's parent, so if you cloned into the game
-folder you can leave it out. `mods_dir` defaults to `mods/` beside the
+folder you can leave it out; failing that the usual Steam library locations are
+searched. `mods_dir` defaults to `mods/` beside the
 repository root. All three can also come from the environment, as
 `CQMOD_GAME_DIR`, `CQMOD_AES_KEY` and `CQMOD_MODS_DIR`.
 
@@ -54,7 +61,8 @@ Every candidate is confirmed by decrypting the entire index and comparing SHA-1
 against the hash stored in the pak footer, so a reported key is proven rather
 than guessed.
 
-If it reports a permission error, Linux is restricting `ptrace`:
+Reading another process's memory needs permission. On Windows, run the tool as
+administrator. On Linux, `ptrace` is restricted by default:
 
 ```bash
 sudo sysctl -w kernel.yama.ptrace_scope=0    # revert with =1
@@ -62,16 +70,21 @@ sudo sysctl -w kernel.yama.ptrace_scope=0    # revert with =1
 
 That setting is a hardening measure, so turn it back on when you are done.
 
+The key is baked into a game build rather than tied to a player, so one recovery
+covers every copy of that version and you only need it again after a patch that
+changes it.
+
 ## Checking the setup
 
 ```bash
 python3 tools/selftest.py
 ```
 
-Sixteen checks run against the real archive: index decryption, Oodle decoding of
-400 assets, package parsing, localization round-tripping, texture
-round-tripping, pak writing, the field finder, and a complete mod build. All
-should pass before you rely on anything else.
+Over a hundred checks run against the real archive: index decryption, Oodle
+decoding, package parsing, growing name and import tables across all 1,790 data
+assets, localization and texture round-tripping, pak writing, the field finder,
+every randomizer category, and a complete mod build. All should pass before you
+rely on anything else.
 
 ## Your first mod
 
