@@ -1289,9 +1289,16 @@ class MainWindow(QMainWindow):
                                      off=f.offset, val=shown, editable=f.editable,
                                      tag=None, add=None, path=asset.path, owned=owned))
                     if self.usmap.is_tag_container(e, f.index):
+                        # A tag is an index into its own asset's name table, so
+                        # it has to be resolved against that asset. Tags live on
+                        # units, and a summon card shows its unit as a linked
+                        # asset, so resolving against the selected asset left
+                        # every tag on a card reading <name 0>.
+                        owner_pkg = pkg_of(asset)
+                        owner_names = owner_pkg.names if owner_pkg else []
                         for k, (off, nidx) in enumerate(self.usmap.tags(f, payload)):
-                            nm = self._names[nidx] if owned and nidx < len(self._names) \
-                                else f"<name {nidx}>"
+                            nm = (owner_names[nidx] if 0 <= nidx < len(owner_names)
+                                  else f"<name {nidx}>")
                             rows.append(dict(ex=e.index, name=f"    tag[{k}]",
                                              type="GameplayTag", off=off, val=nm,
                                              editable=False, tag=nidx, add=None,

@@ -286,6 +286,27 @@ def main():
             check("a two-tag unit still places its later properties",
                   "MaxHealth" in placed_arch and "RotationSpeed" in placed_arch)
 
+            # A tag is an index into its own asset's name table. Tags live on
+            # units, and the editor shows a summon card's unit beside it, so
+            # resolving against whichever asset happens to be selected reads
+            # the wrong table and turns every tag into a placeholder.
+            card = by.get("DA_Card_Summon_Human_Archer")
+            if card:
+                card_names = uasset.parse(r.read(card.uasset)).names
+                indices = [i for e in arch.exports for f in um.place(e, pa2)
+                           if um.is_tag_container(e, f.index)
+                           for _, i in um.tags(f, pa2)]
+                via_owner = [anames[i] for i in indices if i < len(anames)]
+                via_other = [card_names[i] for i in indices if i < len(card_names)]
+                check("a unit's tags resolve against the unit, not the card",
+                      all(t.count(".") >= 2 for t in via_owner)
+                      and via_owner != via_other,
+                      f"unit {via_owner} vs card {via_other}")
+                known = um.collect_tags(r, assets)
+                check("every resolved tag is one the tag list offers",
+                      set(via_owner) <= set(known),
+                      str(sorted(set(via_owner) - set(known))))
+
         total_ex = placed_ex = 0
         for x in assets:
             px = r.read(x.uexp)
