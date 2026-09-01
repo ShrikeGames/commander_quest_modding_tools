@@ -10,6 +10,7 @@ game data.
 | [Getting started](getting-started.md) | Install, configure, recover the pak key, build a first mod |
 | [GUI guide](gui-guide.md) | The editor, tab by tab |
 | [Finding fields](finding-fields.md) | How to locate the number you actually want to change |
+| [Randomizer](randomizer.md) | Generating a randomized run |
 | [Mod manager](mod-manager.md) | Enabling and disabling installed mods |
 | [Starting decks](starting-decks.md) | Editing what cards a commander begins with |
 | [Adding properties](adding-properties.md) | Giving an asset a stat it does not set |

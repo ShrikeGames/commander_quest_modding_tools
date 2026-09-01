@@ -10,7 +10,7 @@ import io, struct, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain, decks
+from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain, decks, randomizer
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -434,6 +434,69 @@ def main():
         check("exports still tile the payload after insertion",
               total4 == len(pay4) - 4, f"{total4} vs {len(pay4) - 4}")
         m4.close(); Path(tmp4).unlink()
+
+    print("\nrandomizer:")
+    if um:
+        every = {c.key: c.modes[0] for c in randomizer.CATEGORIES if c.key != "card_art"}
+        st = randomizer.Settings(seed=99, choices=every)
+        rp1 = Project(name="Rando")
+        sm1 = randomizer.run(r, assets, um, st, rp1)
+        check("every category produces edits", all(v > 0 for v in sm1.values()),
+              str(sm1))
+
+        rp2 = Project(name="Rando")
+        sm2 = randomizer.run(r, assets, um,
+                             randomizer.Settings(seed=99, choices=every), rp2)
+        same = ([(v.asset_path, v.offset, v.value) for v in rp1.values]
+                == [(v.asset_path, v.offset, v.value) for v in rp2.values])
+        check("the same seed reproduces the same mod", same and sm1 == sm2)
+
+        rp3 = Project(name="Rando")
+        randomizer.run(r, assets, um,
+                       randomizer.Settings(seed=100, choices=every), rp3)
+        check("a different seed gives a different mod",
+              [(v.asset_path, v.offset, v.value) for v in rp3.values]
+              != [(v.asset_path, v.offset, v.value) for v in rp1.values])
+
+        # The guard is about commander units, whose health decides whether a run
+        # is winnable. Commander cards are ordinary cards and may be touched.
+        # Match on the asset name, not the path: the game's content root is
+        # itself called "Commander", so every pak path contains the word.
+        touched_units = [v.asset_path for v in rp1.values
+                         if Path(v.asset_path).name.startswith("DA_Unit_")
+                         and "Commander" in Path(v.asset_path).name]
+        check("commander units are left alone by default", not touched_units,
+              str(touched_units[:2]))
+        rp4 = Project(name="Rando")
+        randomizer.run(r, assets, um,
+                       randomizer.Settings(seed=99, choices=every,
+                                           include_commanders=True), rp4)
+        check("commander units are randomized when asked",
+              any(Path(v.asset_path).name.startswith("DA_Unit_")
+                  and "Commander" in Path(v.asset_path).name for v in rp4.values))
+
+        # Range tiers are disjoint between melee and projectile attack types, so
+        # randomizing must not move a unit between the two bands.
+        raw6 = rp1.build(r)
+        with tempfile.NamedTemporaryFile(suffix=".pak", delete=False) as f6:
+            f6.write(raw6); tmp6 = f6.name
+        m6 = PakReader(tmp6)
+        bands = {}
+        for x in assets:
+            if x.class_name != "CMUnitData" or x.uexp not in m6:
+                continue
+            g6 = catalog.build_one(m6, x.path)[0]
+            b6 = m6.read(x.uexp)
+            for e in g6.exports:
+                for f in um.place(e, b6):
+                    if f.name == "AttackRangeStatus":
+                        bands.setdefault(e.class_name, set()).add(f.value)
+        melee = set().union(*[v for k, v in bands.items() if "Melee" in k] or [set()])
+        ranged = set().union(*[v for k, v in bands.items() if "Project" in k] or [set()])
+        check("melee and ranged keep their own range bands",
+              melee and ranged and not (melee & ranged),
+              f"melee {sorted(melee)}, ranged {sorted(ranged)}")
+        m6.close(); Path(tmp6).unlink()
 
     print("\nstarting decks:")
     rows = decks.card_rows(r)

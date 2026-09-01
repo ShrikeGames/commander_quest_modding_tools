@@ -15,12 +15,12 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QTabWidget, QTextEdit, QPlainTextEdit, QFileDialog,
     QMessageBox, QHeaderView, QAbstractItemView, QComboBox, QGroupBox,
     QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy, QComboBox,
-    QInputDialog,
+    QInputDialog, QSpinBox, QDoubleSpinBox,
 )
 
 from datetime import datetime
 
-from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain, decks
+from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain, decks, randomizer
 from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
@@ -209,9 +209,10 @@ class MainWindow(QMainWindow):
 
         self.main_tabs = QTabWidget()
         self.main_tabs.addTab(split, "Edit assets")
+        self.main_tabs.addTab(self._randomizer_panel(), "Randomizer")
         self.main_tabs.addTab(self._mods_panel(), "Mods")
         self.main_tabs.currentChanged.connect(
-            lambda i: self._refresh_mods() if i == 1 else None)
+            lambda i: self._refresh_mods() if i == 2 else None)
         self.setCentralWidget(self.main_tabs)
         self.setStatusBar(QStatusBar())
 
@@ -349,6 +350,173 @@ class MainWindow(QMainWindow):
         row.addWidget(b); row.addStretch(); lay.addLayout(row)
         self.tabs.addTab(page, "Pending edits")
         return self.tabs
+
+    def _randomizer_panel(self):
+        """Build the randomizer tab.
+
+        Returns:
+            QWidget: Seed and options above a list of categories.
+        """
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.addWidget(QLabel(
+            "Pick what to randomize, then generate. The result is staged as ordinary "
+            "edits, so it can be reviewed on the Pending edits tab and built like any "
+            "other mod. A run is reproducible: the same seed and options always give "
+            "the same mod."))
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Seed"))
+        self.seed_spin = QSpinBox()
+        self.seed_spin.setRange(0, 2_000_000_000)
+        self.seed_spin.setValue(1234)
+        row.addWidget(self.seed_spin)
+        roll = QPushButton("Roll")
+        roll.clicked.connect(lambda: self.seed_spin.setValue(
+            __import__("random").randint(0, 2_000_000_000)))
+        row.addWidget(roll)
+        row.addSpacing(20)
+        row.addWidget(QLabel("Variance"))
+        self.variance_spin = QDoubleSpinBox()
+        self.variance_spin.setRange(0.0, 2.0)
+        self.variance_spin.setSingleStep(0.1)
+        self.variance_spin.setValue(0.0)
+        self.variance_spin.setToolTip(
+            "How far a rolled value may fall outside the range the game itself "
+            "uses. 0 keeps rolls within it.")
+        row.addWidget(self.variance_spin)
+        self.enemies_box = QCheckBox("Include enemy units")
+        self.enemies_box.setChecked(True)
+        row.addWidget(self.enemies_box)
+        self.commanders_box = QCheckBox("Include commanders")
+        self.commanders_box.setToolTip(
+            "Off by default. Rolling a commander's health down to a few points "
+            "makes a run unwinnable rather than interesting.")
+        row.addWidget(self.commanders_box)
+        row.addStretch()
+        lay.addLayout(row)
+
+        self.rando_table = QTableWidget(len(randomizer.CATEGORIES), 3)
+        self.rando_table.setHorizontalHeaderLabels(["Randomize", "Mode", "What it does"])
+        self.rando_table.verticalHeader().setVisible(False)
+        self.rando_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        for r, c in enumerate(randomizer.CATEGORIES):
+            box = QTableWidgetItem(c.label)
+            box.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            # Art shuffling copies pixels rather than repointing a reference, so
+            # it is off by default: it alone turns a 1 MB mod into a 1 GB one.
+            box.setCheckState(Qt.Unchecked)
+            self.rando_table.setItem(r, 0, box)
+            combo = QComboBox()
+            combo.addItems(list(c.modes))
+            combo.currentIndexChanged.connect(lambda _: self._rando_estimate())
+            self.rando_table.setCellWidget(r, 1, combo)
+            desc = QTableWidgetItem(c.description)
+            desc.setFlags(desc.flags() & ~Qt.ItemIsEditable)
+            self.rando_table.setItem(r, 2, desc)
+        self.rando_table.resizeRowsToContents()
+        lay.addWidget(self.rando_table)
+
+        self.rando_note = QLabel()
+        self.rando_note.setWordWrap(True)
+        lay.addWidget(self.rando_note)
+        # Connected only once the rows and the note exist, since populating the
+        # table emits itemChanged for every cell.
+        self.rando_table.itemChanged.connect(lambda _: self._rando_estimate())
+
+        row = QHBoxLayout()
+        gen = QPushButton("Generate randomized edits")
+        gen.setStyleSheet(
+            "QPushButton{background:%s;color:white;padding:6px 16px;"
+            "font-weight:600;border-radius:3px}" % ACCENT)
+        gen.clicked.connect(self._rando_generate)
+        row.addWidget(gen)
+        sel = QPushButton("Select all")
+        sel.clicked.connect(lambda: self._rando_set_all(True))
+        clr = QPushButton("Select none")
+        clr.clicked.connect(lambda: self._rando_set_all(False))
+        row.addWidget(sel); row.addWidget(clr); row.addStretch()
+        lay.addLayout(row)
+        self._rando_estimate()
+        return page
+
+    def _rando_set_all(self, on):
+        """Tick or clear every category.
+
+        Args:
+            on (bool): Whether to select them.
+        """
+        for r in range(self.rando_table.rowCount()):
+            self.rando_table.item(r, 0).setCheckState(
+                Qt.Checked if on else Qt.Unchecked)
+
+    def _rando_settings(self):
+        """Read the chosen options.
+
+        Returns:
+            cqmod.randomizer.Settings: The current selection.
+        """
+        choices = {}
+        for r, c in enumerate(randomizer.CATEGORIES):
+            box = self.rando_table.item(r, 0)
+            combo = self.rando_table.cellWidget(r, 1)
+            if box is None or combo is None:
+                continue
+            if box.checkState() == Qt.Checked:
+                choices[c.key] = combo.currentText()
+        return randomizer.Settings(seed=self.seed_spin.value(), choices=choices,
+                                   variance=self.variance_spin.value(),
+                                   include_enemies=self.enemies_box.isChecked(),
+                                   include_commanders=self.commanders_box.isChecked())
+
+    def _rando_estimate(self):
+        """Warn about the size the current selection would produce."""
+        chosen = self._rando_settings().choices
+        if not chosen:
+            self.rando_note.setText("Nothing selected.")
+            return
+        note = f"{len(chosen)} categor{'y' if len(chosen) == 1 else 'ies'} selected."
+        if "card_art" in chosen:
+            note += ("  <b>Card art shuffling copies the images themselves</b>, "
+                     "because pointing a card at another card's art needs a "
+                     "reference change that is not supported yet. That takes the "
+                     "mod from roughly a megabyte to about a gigabyte, and makes "
+                     "the build take minutes.")
+        self.rando_note.setText(note)
+
+    def _rando_generate(self):
+        """Generate randomized edits into the current project."""
+        if not self.reader or not self.usmap:
+            QMessageBox.warning(self, "Not ready",
+                                "The archive and property schema must load first.")
+            return
+        settings = self._rando_settings()
+        if not settings.choices:
+            QMessageBox.information(self, "Nothing selected",
+                                    "Tick at least one category to randomize.")
+            return
+        if self.project.values or self.project.tags or self.project.textures:
+            if QMessageBox.question(
+                    self, "Replace staged edits?",
+                    "Generating will add to the edits already staged. Clear them "
+                    "first?") == QMessageBox.Yes:
+                self.project = Project(name=self.project.name)
+        try:
+            summary = randomizer.run(self.reader, self.assets, self.usmap,
+                                     settings, self.project)
+        except Exception as e:
+            QMessageBox.critical(self, "Randomize failed", str(e))
+            return
+        self._refresh_edits()
+        if self.current:
+            self._select_asset()
+        lines = "\n".join(
+            f"{randomizer.CATEGORY_BY_KEY[k].label}: {v} change(s)"
+            for k, v in summary.items())
+        QMessageBox.information(
+            self, "Randomized",
+            f"Seed {settings.seed}\n\n{lines}\n\n"
+            "Review them on the Pending edits tab, then Build & Install.")
 
     def _mods_panel(self):
         """Build the mod manager tab.

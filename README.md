@@ -20,6 +20,7 @@ loads at startup.
 | **Edit decks** | Change the cards a commander starts with |
 | **Find fields** | Diff a card against its `+` upgrade variant to locate gameplay numbers |
 | **Build** | Compile staged edits into `ZZZ_<name>_P.pak` and install it |
+| **Randomize** | Generate a seeded randomized run from a checklist of categories |
 | **Manage mods** | List installed mods and enable or disable each one |
 
 Asset classes indexed include `CMCardData_*` (666 cards), `CMUnitData` (325 units),
@@ -85,6 +86,7 @@ Full docs are in [`docs/`](docs/index.md):
 | [Getting started](docs/getting-started.md) | Install, configure, recover the key, build a first mod |
 | [GUI guide](docs/gui-guide.md) | The editor, tab by tab |
 | [Finding fields](docs/finding-fields.md) | Locating the number you want to change |
+| [Randomizer](docs/randomizer.md) | Generating a randomized run |
 | [Mod manager](docs/mod-manager.md) | Enabling and disabling installed mods |
 | [Starting decks](docs/starting-decks.md) | Editing what cards a commander begins with |
 | [Adding properties](docs/adding-properties.md) | Giving an asset a stat it does not set |
