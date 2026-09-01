@@ -1,0 +1,120 @@
+name: Build and release
+
+# Packaged builds are produced on the platform they target, because PyInstaller
+# bundles the running interpreter and cannot cross-compile. Pushing a v* tag
+# builds both and publishes them as a release; every other run just proves the
+# packaging still works.
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux
+            archive: CommanderQuestModTool-linux-x86_64.tar.gz
+          - os: windows-latest
+            label: windows
+            archive: CommanderQuestModTool-windows-x86_64.zip
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # The Linux runner has gcc already. The Windows runner needs a compiler
+      # for the two native pieces, and MinGW builds both without MSVC.
+      - name: Install MinGW
+        if: matrix.label == 'windows'
+        run: choco install mingw --no-progress
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build the native decoder and key scanner
+        run: python tools/build_native.py
+
+      - name: Package the application
+        run: pyinstaller --noconfirm packaging/cqmod.spec
+
+      - name: Add the readme users see first
+        shell: bash
+        run: cp packaging/README-package.txt dist/CommanderQuestModTool/README.txt
+
+      - name: Create the archive
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.label }}" = "windows" ]; then
+            7z a -tzip "../${{ matrix.archive }}" CommanderQuestModTool
+          else
+            tar czf "../${{ matrix.archive }}" CommanderQuestModTool
+          fi
+
+      - name: Check the build actually starts
+        if: matrix.label == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libxkbcommon-x11-0 libxcb-cursor0
+          # Exit 124 means it was still running when the timeout fired, which is
+          # what a GUI that started correctly does.
+          QT_QPA_PLATFORM=offscreen timeout 30 \
+            ./dist/CommanderQuestModTool/CommanderQuestModTool || \
+            test $? -eq 124
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          draft: false
+          generate_release_notes: true
+          body: |
+            Download the archive for your platform, unpack it anywhere, and run
+            **CommanderQuestModTool**. Nothing is installed and no Python,
+            compiler or other setup is needed.
+
+            On first launch the tool asks where Commander Quest is (it usually
+            finds it on its own) and for the archive key. The game builds that
+            key while it runs, so start the game, wait for the main menu, and
+            press **Recover key from the running game**. It is the same key for
+            everyone on a given version and is only needed again if a patch
+            changes it.
+
+            Linux users may need to allow reading the game's memory for that one
+            step: `sudo sysctl -w kernel.yama.ptrace_scope=0`. Windows users may
+            need to run the tool as administrator for it.

@@ -24,6 +24,8 @@ import collections
 
 from . import ftext
 
+from . import resources
+
 DEFAULT_PATH = Path(__file__).resolve().parent.parent / "schema" / "usmap.json"
 
 EXPORT_TRAILER = 4
@@ -152,7 +154,7 @@ class Usmap:
             UsmapError: If the file is missing or not valid JSON. Regenerate it
                 with ``tools/usmap/dump.py`` while the game is running.
         """
-        p = Path(path or DEFAULT_PATH)
+        p = Path(path or resources.usmap_path())
         if not p.is_file():
             raise UsmapError(
                 f"{p} not found. Launch the game and run tools/usmap/dump.py")

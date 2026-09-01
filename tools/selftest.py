@@ -6,11 +6,13 @@ packages carry a magic and a header size, and locres/texture writers are checked
 by round-tripping. Run this after changing anything in cqmod/.
 """
 from __future__ import annotations
-import io, struct, sys, tempfile, time
+import io, os, struct, subprocess, sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config, catalog, locres, texture, uasset, unversioned, diff, mods, schema, usmap, artchain, decks, randomizer
+from cqmod import (config, catalog, locres, texture, uasset, unversioned,
+                   diff, mods, schema, usmap, artchain, decks, randomizer,
+                   keyfinder, resources)
 from cqmod.pak import PakReader, build_pak
 from cqmod.project import Project
 
@@ -891,6 +893,72 @@ def main():
         except mods.ModError:
             rejected = True
         check("importing a non-pak is rejected", rejected)
+
+    print("\npackaging:")
+    check("the schema is found where the app looks for it",
+          resources.usmap_path().is_file(), str(resources.usmap_path()))
+    check("settings persist outside the bundle",
+          config.LOCAL_CONFIG.parent == resources.app_dir())
+    check("a game folder is recognised by its archive",
+          config.is_game_dir(config.game_dir())
+          and not config.is_game_dir(Path(__file__).parent))
+
+    ooz_lib = resources.ooz_library()
+    check("the Oodle decoder is built and discoverable",
+          ooz_lib is not None and ooz_lib.is_file(),
+          str(ooz_lib) if ooz_lib else "run tools/build_native.py")
+    if ooz_lib:
+        # The wrapper's unmangled name is what lets one prebuilt library work
+        # everywhere; the C++ symbol's mangling encodes the size_t width.
+        symbols = subprocess.run(["nm", "-D", str(ooz_lib)],
+                                 capture_output=True, text=True).stdout
+        check("it exports a portable entry point",
+              "ooz_kraken_decompress" in symbols or not symbols,
+              "nm unavailable" if not symbols else "symbol present")
+
+    scanner = resources.aes_finder()
+    check("the key scanner is built and discoverable",
+          scanner is not None and scanner.is_file(),
+          str(scanner) if scanner else "run tools/build_native.py")
+
+    offset, index_size, want_sha1 = keyfinder.pak_index_info(config.pak_path())
+    check("the pak footer gives up its index and hash",
+          index_size > 0 and len(want_sha1) == 20,
+          f"index {index_size:,} bytes at {offset:#x}")
+    with open(config.pak_path(), "rb") as f:
+        f.seek(offset)
+        encrypted_index = f.read(index_size)
+    real_key = config.aes_key()
+    check("the real key is confirmed against the index hash",
+          keyfinder.confirms(real_key, encrypted_index, want_sha1))
+    check("a wrong key is rejected",
+          not keyfinder.confirms(bytes(32), encrypted_index, want_sha1))
+
+    # The scanner normally reads a live game. Pointing it at a file with a key
+    # planted in it exercises the same AES and the same filter without needing
+    # the game to be running, which is what makes it testable at all.
+    if scanner:
+        with tempfile.NamedTemporaryFile(suffix=".bin", delete=False) as f9:
+            blob = bytearray(os.urandom(4 << 20))
+            blob[1_000_003:1_000_035] = real_key   # deliberately unaligned
+            f9.write(blob); dump = f9.name
+        found = subprocess.run(
+            [str(scanner), "--file", dump, "--block",
+             encrypted_index[:16].hex().upper()],
+            capture_output=True, text=True)
+        Path(dump).unlink()
+        reported = [l.split("=", 1)[1].split()[0]
+                    for l in found.stdout.splitlines()
+                    if l.startswith("CANDIDATE=")]
+        check("the scanner finds a key planted in a buffer",
+              real_key.hex().upper() in reported,
+              f"{len(reported)} candidates from 4 MB")
+        confirmed = [k for k in reported
+                     if keyfinder.confirms(bytes.fromhex(k), encrypted_index,
+                                           want_sha1)]
+        check("only the real key survives confirmation",
+              confirmed == [real_key.hex().upper()],
+              f"{len(confirmed)} of {len(reported)} confirmed")
 
     print(f"\n{passed} passed, {failed} failed")
     return 1 if failed else 0

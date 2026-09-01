@@ -1,0 +1,3 @@
+# Extra packages needed to build a distributable, not to run from a checkout.
+-r requirements.txt
+pyinstaller>=6.0

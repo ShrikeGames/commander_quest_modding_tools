@@ -1,82 +1,34 @@
 #!/usr/bin/env python3
 """Recover the pak index AES key from the running game.
 
-The key is assembled at runtime rather than stored, so scanning the shipped
-binaries finds nothing. It has to be read out of live process memory instead.
-Each candidate is confirmed by decrypting the entire index and comparing SHA-1
-against the pak footer's hash, so a reported key is proven, not guessed.
+Unreal bakes the key into a build, so every copy of a given version shares one
+and this only has to be run once, or again after a patch that rotates it. The
+key is assembled at runtime rather than stored, so it cannot be read out of the
+shipped files and has to come from the live process.
 
-    1. launch Commander Quest
+Each candidate is proven by decrypting the whole index and comparing SHA-1
+against the pak footer's hash, so a reported key is confirmed, not guessed.
+
+    1. launch Commander Quest and wait for the main menu
     2. python3 tools/find_aes_key.py --save
 """
 from __future__ import annotations
-import argparse, struct, subprocess, sys
+import argparse, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from cqmod import config
-
-PROC_NAME = "CommanderGame-Win64-Shipping"
-FINDER_DIR = Path(__file__).resolve().parent / "aes_finder"
-
-
-def find_pid():
-    """Locate the running game process.
-
-    Returns:
-        int | None: The PID of the shipping binary, or None if it is not
-        running. Matches on the full command line, since under Proton the
-        process name alone is not distinctive.
-    """
-    try:
-        out = subprocess.run(["pgrep", "-f", PROC_NAME],
-                             capture_output=True, text=True).stdout
-    except FileNotFoundError:
-        return None
-    for tok in out.split():
-        pid = int(tok)
-        try:
-            if PROC_NAME.encode() in Path(f"/proc/{pid}/cmdline").read_bytes():
-                return pid
-        except OSError:
-            continue
-    return None
-
-
-def pak_index_info(pak: Path):
-    """Read the index location and hash from a pak footer.
-
-    Args:
-        pak (Path): The archive to inspect.
-
-    Returns:
-        tuple[int, int, str]: Index offset, index size, and the index SHA-1 as
-        hex. The hash is what lets a candidate key be *proven* rather than
-        guessed.
-    """
-    with open(pak, "rb") as f:
-        f.seek(0, 2); size = f.tell()
-        f.seek(size - 221); foot = f.read(221)
-        i = foot.find(struct.pack("<I", 0x5A6F12E1))
-        if i < 0:
-            sys.exit(f"{pak} does not look like a .pak")
-        off, isz = struct.unpack_from("<qq", foot, i + 8)
-        return off, isz, foot[i + 24:i + 44].hex()
+from cqmod import config, keyfinder
 
 
 def main():
     """Recover the key and optionally store it.
 
-    Builds the native scanner on demand, runs it against the game process, and
-    prints the recovered key.
-
     Returns:
         None
 
     Raises:
-        SystemExit: If the game is not running, the scanner cannot be built,
-            process memory is unreadable, or no key is found. Each case exits
-            with a message naming the fix.
+        SystemExit: If the game is not running, its memory cannot be read, or
+            no key is found. Each case exits with a message naming the fix.
     """
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -85,32 +37,12 @@ def main():
                     help=f"write the key into {config.LOCAL_CONFIG.name}")
     args = ap.parse_args()
 
-    pid = args.pid or find_pid()
-    if not pid:
-        sys.exit(f"No running {PROC_NAME} found. Launch the game first.")
+    try:
+        key = keyfinder.find_key(config.pak_path(), args.pid,
+                                 progress=lambda m: print(m, file=sys.stderr))
+    except (keyfinder.KeyFinderError, config.ConfigError) as e:
+        sys.exit(str(e))
 
-    finder = FINDER_DIR / "aes_finder"
-    if not finder.is_file():
-        print("building aes_finder...")
-        try:
-            subprocess.run(["make", "-C", str(FINDER_DIR)], check=True,
-                           capture_output=True, text=True)
-        except subprocess.CalledProcessError as e:
-            sys.exit(f"build failed (is libssl-dev installed?):\n{e.stderr}")
-
-    pak = config.pak_path()
-    off, size, sha1 = pak_index_info(pak)
-    print(f"scanning pid {pid} for the key to {pak.name} ...")
-    r = subprocess.run([str(finder), str(pid), str(pak), hex(off), str(size), sha1],
-                       capture_output=True, text=True)
-    sys.stderr.write(r.stderr)
-    if r.returncode == 3:
-        sys.exit("Cannot read process memory. Try:\n"
-                 "    sudo sysctl -w kernel.yama.ptrace_scope=0")
-    if r.returncode != 0:
-        sys.exit("Key not found. Make sure the game is past the loading screen.")
-
-    key = next(l.split("=", 1)[1] for l in r.stdout.splitlines() if l.startswith("KEY="))
     print(f"\n{key}")
     if args.save:
         config.save_local(aes_key=key)

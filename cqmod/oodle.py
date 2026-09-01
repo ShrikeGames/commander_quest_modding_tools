@@ -9,11 +9,14 @@ Only decompression is needed. Mod paks are written with uncompressed entries, so
 there is no dependency on an Oodle *compressor* anywhere in these tools.
 """
 from __future__ import annotations
-import ctypes, subprocess
+import ctypes, os, subprocess
 from pathlib import Path
 
+from . import resources
+
 _OOZ_DIR = Path(__file__).resolve().parent.parent / "third_party" / "ooz"
-_LIB_PATH = _OOZ_DIR / "libooz.so"
+_LIB_NAME = "libooz.dll" if os.name == "nt" else "libooz.so"
+_LIB_PATH = _OOZ_DIR / _LIB_NAME
 
 _SAFE_SPACE = 512
 """Slack appended to output buffers; ooz may write a little past the end."""
@@ -36,14 +39,20 @@ def _ensure_built() -> Path:
         OodleError: If ``make`` is unavailable or the compile fails, quoting the
             compiler's own stderr.
     """
-    if not _LIB_PATH.is_file():
-        try:
-            subprocess.run(["make", "-C", str(_OOZ_DIR)], check=True,
-                           capture_output=True, text=True)
-        except FileNotFoundError as e:
-            raise OodleError("'make' not found; cannot build third_party/ooz") from e
-        except subprocess.CalledProcessError as e:
-            raise OodleError(f"building libooz.so failed:\n{e.stderr}") from e
+    prebuilt = resources.ooz_library()
+    if prebuilt is not None:
+        return prebuilt
+    if resources.is_frozen():
+        raise OodleError(
+            "This build is missing its Oodle decoder, which should have been "
+            "packaged with it. Please report this as a packaging bug.")
+    try:
+        subprocess.run(["make", "-C", str(_OOZ_DIR)], check=True,
+                       capture_output=True, text=True)
+    except FileNotFoundError as e:
+        raise OodleError("'make' not found; cannot build third_party/ooz") from e
+    except subprocess.CalledProcessError as e:
+        raise OodleError(f"building {_LIB_NAME} failed:\n{e.stderr}") from e
     return _LIB_PATH
 
 
@@ -51,14 +60,24 @@ def _load():
     """Bind the decoder entry point, building and loading the library if needed.
 
     Returns:
-        ctypes._FuncPtr: ``int Kraken_Decompress(const byte*, size_t, byte*, size_t)``.
-        The mangled C++ name is looked up directly because upstream declares no
-        ``extern "C"`` interface.
+        ctypes._FuncPtr: ``int ooz_kraken_decompress(const byte*, size_t,
+        byte*, size_t)``, the wrapper in ``ooz_export.cpp``.
     """
     global _fn
     if _fn is None:
         lib = ctypes.CDLL(str(_ensure_built()))
-        fn = lib._Z17Kraken_DecompressPKhmPhm
+        # Prefer the wrapper's unmangled name. A library built before that
+        # existed only carries the C++ symbol, whose mangling encodes the
+        # size_t width and so differs between platforms.
+        try:
+            fn = lib.ooz_kraken_decompress
+        except AttributeError:
+            try:
+                fn = lib._Z17Kraken_DecompressPKhmPhm
+            except AttributeError as e:
+                raise OodleError(
+                    "the Oodle library exports no known decompress entry "
+                    "point; rebuild it with 'make -C third_party/ooz'") from e
         fn.restype = ctypes.c_int
         fn.argtypes = [ctypes.c_char_p, ctypes.c_size_t, ctypes.c_char_p, ctypes.c_size_t]
         _fn = fn

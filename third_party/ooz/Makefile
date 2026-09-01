@@ -7,8 +7,8 @@ CXX      ?= g++
 CXXFLAGS ?= -O2 -fPIC -msse4.1 -w
 GEN       = kraken_lib.cpp lzna_lib.cpp bitknit_lib.cpp
 
-libooz.so: $(GEN) ooz_linux.h
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(GEN)
+libooz.so: $(GEN) ooz_export.cpp ooz_linux.h
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(GEN) ooz_export.cpp
 
 # Cut at the first Windows-only declaration rather than a hardcoded line number.
 kraken_lib.cpp: kraken.cpp

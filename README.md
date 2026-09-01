@@ -26,12 +26,34 @@ loads at startup.
 Asset classes indexed include `CMCardData_*` (666 cards), `CMUnitData` (325 units),
 `CMGearDefinition` (151 gear), `CMCommanderData` (5 commanders), quests, events and more.
 
-## Setup
+## Install
+
+Grab the build for your platform from
+[Releases](https://github.com/ShrikeGames/commander_quest_modding_tools/releases),
+unpack it anywhere, and run **CommanderQuestModTool**. No Python, no compiler,
+nothing installed.
+
+On first launch it asks where the game is, which it can usually work out, and
+for the archive key. The game assembles that key while it runs, so start the
+game, wait for the main menu, and press **Recover key from the running game**.
+The key is the same for everyone on a given version, so this is a one-time step
+unless a patch changes it. Reading another process's memory needs permission:
+run the tool as administrator on Windows, or once on Linux
+`sudo sysctl -w kernel.yama.ptrace_scope=0`.
+
+The key is deliberately not shipped. It belongs to the game, so you take it
+from your own copy, and recovering it locally still works after a patch that
+rotates it.
+
+## Setup from source
 
 ```bash
-pip install -r requirements.txt          # cryptography, Pillow, PySide6
-sudo apt install build-essential libssl-dev   # to build the Oodle decoder
+pip install -r requirements.txt          # cryptography, Pillow, PySide6, numpy
+python3 tools/build_native.py            # the Oodle decoder and key scanner
 ```
+
+`tools/build_native.py` needs only a C and C++ compiler, and works on Linux and
+Windows. See [Packaging](docs/packaging.md) to produce a release build.
 
 Create `cqmod_config.local.json`, which is gitignored because it holds a key
 specific to your copy:
@@ -45,8 +67,9 @@ specific to your copy:
 ```
 
 The pak's index is AES-encrypted and **the key is assembled at runtime, so it is not
-present in any shipped binary**. Recover it from your own installed copy: launch the
-game, then
+present in any shipped binary**. It is baked into a build rather than tied to a
+player, so one key covers every copy of a given version. Recover it from your
+own installed copy: launch the game, then
 
 ```bash
 python3 tools/find_aes_key.py --save

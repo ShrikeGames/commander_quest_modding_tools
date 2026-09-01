@@ -15,12 +15,13 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QTabWidget, QTextEdit, QPlainTextEdit, QFileDialog,
     QMessageBox, QHeaderView, QAbstractItemView, QComboBox, QGroupBox,
     QFormLayout, QStatusBar, QProgressDialog, QToolBar, QSizePolicy, QComboBox,
-    QInputDialog, QSpinBox, QDoubleSpinBox,
+    QInputDialog, QSpinBox, QDoubleSpinBox, QDialog, QDialogButtonBox,
 )
 
 from datetime import datetime
 
-from cqmod import config, catalog, texture, locres, uasset, diff, mods, usmap, artchain, decks, randomizer
+from cqmod import (config, catalog, texture, locres, uasset, diff, mods,
+                   usmap, artchain, decks, randomizer, keyfinder, resources)
 from cqmod.mods import ModError, ModInfo, ModManager, display_name
 from cqmod.pak import PakReader
 from cqmod.project import Project
@@ -97,6 +98,182 @@ def summarise_log(lines):
             continue
         counts[kinds[parts[0]]] = counts.get(kinds[parts[0]], 0) + 1
     return "\n".join(f"{n:,} {kind}" for kind, n in sorted(counts.items()))
+
+
+class KeyThread(QThread):
+    """Recovers the pak key without freezing the window.
+
+    A scan reads gigabytes of another process's memory, so it can take a minute
+    or two. Running it on the GUI thread would make the application look hung
+    for the whole time.
+    """
+
+    progress = Signal(str)
+    done = Signal(str, str)
+
+    def __init__(self, pak):
+        """Prepare a scan.
+
+        Args:
+            pak (pathlib.Path): The archive whose key is wanted.
+        """
+        super().__init__()
+        self.pak = pak
+
+    def run(self):
+        """Scan for the key and report the result.
+
+        Returns:
+            None
+        """
+        try:
+            key = keyfinder.find_key(self.pak, progress=self.progress.emit)
+            self.done.emit(key, "")
+        except Exception as e:
+            self.done.emit("", str(e))
+
+
+class SetupDialog(QDialog):
+    """First-run setup: where the game is, and the key needed to read it.
+
+    A packaged build is launched from wherever it was unzipped, so unlike a
+    checkout it cannot assume it sits inside the game folder, and it starts with
+    no key. Both are asked for here rather than in a config file, so that
+    nothing about the tool requires editing JSON by hand.
+    """
+
+    def __init__(self, parent=None):
+        """Build the dialog, prefilling anything that can be worked out.
+
+        Args:
+            parent (QWidget | None): Dialog parent.
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Setup")
+        self.setMinimumWidth(620)
+        self._thread = None
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(
+            "<b>Commander Quest Mod Tool needs two things before it can start."
+            "</b>"))
+
+        game_box = QGroupBox("1. Where Commander Quest is installed")
+        game_layout = QVBoxLayout(game_box)
+        row = QHBoxLayout()
+        self.game_edit = QLineEdit(str(config.game_dir()))
+        browse = QPushButton("Browse...")
+        browse.clicked.connect(self._browse)
+        row.addWidget(self.game_edit); row.addWidget(browse)
+        game_layout.addLayout(row)
+        self.game_status = QLabel()
+        game_layout.addWidget(self.game_status)
+        layout.addWidget(game_box)
+
+        key_box = QGroupBox("2. The archive key for this version of the game")
+        key_layout = QVBoxLayout(key_box)
+        key_layout.addWidget(QLabel(
+            "The game builds this key while it runs, so it has to be read from "
+            "the running game once. It is the same for everyone on a given "
+            "version, and is only needed again after a patch changes it."))
+        self.key_edit = QLineEdit()
+        self.key_edit.setPlaceholderText("64 hex characters")
+        try:
+            self.key_edit.setText(config.aes_key().hex().upper())
+        except config.ConfigError:
+            pass
+        key_layout.addWidget(self.key_edit)
+        self.recover_btn = QPushButton("Recover key from the running game")
+        self.recover_btn.clicked.connect(self._recover)
+        key_layout.addWidget(self.recover_btn)
+        self.key_status = QLabel()
+        self.key_status.setWordWrap(True)
+        key_layout.addWidget(self.key_status)
+        layout.addWidget(key_box)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self._save)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+        self.game_edit.textChanged.connect(self._check_game)
+        self._check_game()
+
+    def _browse(self):
+        """Ask for the game folder with a directory picker."""
+        picked = QFileDialog.getExistingDirectory(
+            self, "Select the Commander Quest folder", self.game_edit.text())
+        if picked:
+            self.game_edit.setText(picked)
+
+    def _check_game(self):
+        """Report whether the chosen folder really holds the game."""
+        ok = config.is_game_dir(self.game_edit.text())
+        self.game_status.setText(
+            "Found the game archive." if ok else
+            "No game archive here. Pick the folder containing "
+            "Commander/Content/Paks.")
+        self.game_status.setStyleSheet(
+            "color: green" if ok else f"color: {ACCENT}")
+        return ok
+
+    def _recover(self):
+        """Start a background scan for the key."""
+        if not self._check_game():
+            return
+        pak = Path(self.game_edit.text()) / config.PAK_RELPATH
+        self.recover_btn.setEnabled(False)
+        self.key_status.setText("Looking for the running game...")
+        self._thread = KeyThread(pak)
+        self._thread.progress.connect(self.key_status.setText)
+        self._thread.done.connect(self._recovered)
+        self._thread.start()
+
+    def _recovered(self, key, err):
+        """Show the recovered key, or why the scan failed.
+
+        Args:
+            key (str): The key, or empty on failure.
+            err (str): The error, or empty on success.
+        """
+        self.recover_btn.setEnabled(True)
+        if err:
+            self.key_status.setText(err)
+            self.key_status.setStyleSheet(f"color: {ACCENT}")
+            return
+        self.key_edit.setText(key)
+        self.key_status.setText("Key recovered and verified against the archive.")
+        self.key_status.setStyleSheet("color: green")
+
+    def _save(self):
+        """Validate both settings and write them to the local config."""
+        if not self._check_game():
+            QMessageBox.warning(self, "Game not found",
+                                "Pick the folder that contains "
+                                "Commander/Content/Paks.")
+            return
+        key = self.key_edit.text().strip().removeprefix("0x")
+        try:
+            if len(bytes.fromhex(key)) != 32:
+                raise ValueError("a key is 32 bytes, or 64 hex characters")
+        except ValueError as e:
+            QMessageBox.warning(self, "Key does not look right", str(e))
+            return
+        config.save_local(game_dir=self.game_edit.text(), aes_key=key.upper())
+        self.accept()
+
+
+def needs_setup() -> bool:
+    """Test whether the tool has enough configuration to start.
+
+    Returns:
+        bool: True when the game or its key is still unknown.
+    """
+    try:
+        config.pak_path()
+        config.aes_key()
+        return False
+    except config.ConfigError:
+        return True
 
 
 class ArtView(QLabel):
@@ -230,7 +407,8 @@ class MainWindow(QMainWindow):
         tb.addWidget(self.name_edit)
         tb.addSeparator()
         for text, slot in (("Open Project", self.open_project),
-                           ("Save Project", self.save_project)):
+                           ("Save Project", self.save_project),
+                           ("Setup", self.open_setup)):
             a = QAction(text, self); a.triggered.connect(slot); tb.addAction(a)
         tb.addSeparator()
         spacer = QWidget(); spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -742,6 +920,13 @@ class MainWindow(QMainWindow):
         except ModError as e:
             QMessageBox.warning(self, "Delete failed", str(e))
         self._refresh_mods()
+
+    def open_setup(self):
+        """Reopen setup, for a new game location or a key changed by a patch."""
+        if SetupDialog(self).exec() == QDialog.Accepted:
+            QMessageBox.information(
+                self, "Settings saved",
+                "Restart the tool for the new settings to take effect.")
 
     def _open_staging(self):
         """Open the staging folder in the desktop file manager."""
@@ -1522,7 +1707,17 @@ def main():
     """
     app = QApplication(sys.argv)
     app.setApplicationName("Commander Quest Mod Tool")
-    w = MainWindow(); w.show()
+    # Setup runs before the window exists. The window resolves the game path
+    # while it is being built, so there has to be a usable configuration by
+    # then, which on a fresh install there is not.
+    if needs_setup() and SetupDialog().exec() != QDialog.Accepted:
+        return
+    try:
+        w = MainWindow()
+    except config.ConfigError as e:
+        QMessageBox.critical(None, "Setup incomplete", str(e))
+        return
+    w.show()
     sys.exit(app.exec())
 
 

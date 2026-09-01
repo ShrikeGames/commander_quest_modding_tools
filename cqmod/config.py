@@ -15,11 +15,62 @@ from __future__ import annotations
 import json, os
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-LOCAL_CONFIG = REPO_ROOT / "cqmod_config.local.json"
+from . import resources
+
+REPO_ROOT = resources.REPO_ROOT
+# Settings live beside whatever the user launched. From a checkout that is the
+# repository root, as before; in a packaged build it is the folder holding the
+# executable, because the bundle's own directory is temporary and is deleted
+# when the program exits.
+LOCAL_CONFIG = resources.app_dir() / "cqmod_config.local.json"
 
 DEFAULT_GAME_DIR = REPO_ROOT.parent
 PAK_RELPATH = "Commander/Content/Paks/Commander-Windows.pak"
+GAME_FOLDER = "Commander Quest"
+
+STEAM_LIBRARY_HINTS = [
+    "~/.steam/steam/steamapps/common",
+    "~/.steam/debian-installation/steamapps/common",
+    "~/.local/share/Steam/steamapps/common",
+    "~/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common",
+    "~/Library/Application Support/Steam/steamapps/common",
+    "C:/Program Files (x86)/Steam/steamapps/common",
+    "C:/Program Files/Steam/steamapps/common",
+    "D:/SteamLibrary/steamapps/common",
+    "E:/SteamLibrary/steamapps/common",
+]
+"""Where Steam usually puts games, tried in order when nothing is configured.
+
+A packaged build is launched from wherever the user unzipped it, so it cannot
+assume it sits inside the game folder the way a checkout does. Guessing the
+common locations means most people never have to browse for it.
+"""
+
+
+def find_game_dir() -> Path | None:
+    """Search the usual Steam library folders for the game.
+
+    Returns:
+        Path | None: The first installation found, or None if the game is
+        somewhere unusual and has to be picked by hand.
+    """
+    for hint in STEAM_LIBRARY_HINTS:
+        candidate = Path(hint).expanduser() / GAME_FOLDER
+        if (candidate / PAK_RELPATH).is_file():
+            return candidate
+    return None
+
+
+def is_game_dir(path) -> bool:
+    """Test whether a folder is a Commander Quest installation.
+
+    Args:
+        path (str | Path): Folder to check.
+
+    Returns:
+        bool: True when the folder contains the game's pak.
+    """
+    return (Path(path) / PAK_RELPATH).is_file()
 
 
 class ConfigError(RuntimeError):
@@ -57,7 +108,11 @@ def game_dir() -> Path:
     """
     cfg = _load_local()
     p = os.environ.get("CQMOD_GAME_DIR") or cfg.get("game_dir")
-    return Path(p) if p else DEFAULT_GAME_DIR
+    if p:
+        return Path(p)
+    if is_game_dir(DEFAULT_GAME_DIR):
+        return DEFAULT_GAME_DIR
+    return find_game_dir() or DEFAULT_GAME_DIR
 
 
 def pak_path() -> Path:
@@ -102,7 +157,7 @@ def mods_dir() -> Path:
     """
     cfg = _load_local()
     p = os.environ.get("CQMOD_MODS_DIR") or cfg.get("mods_dir")
-    return Path(p) if p else REPO_ROOT / "mods"
+    return Path(p) if p else resources.app_dir() / "mods"
 
 
 def aes_key() -> bytes:
@@ -122,8 +177,10 @@ def aes_key() -> bytes:
     if not raw:
         raise ConfigError(
             "No pak AES key configured.\n"
-            f"Add 'aes_key' to {LOCAL_CONFIG.name}, set CQMOD_AES_KEY, or run:\n"
-            "    python3 tools/find_aes_key.py --save"
+            f"Add 'aes_key' to {LOCAL_CONFIG.name}, set CQMOD_AES_KEY, or "
+            "recover it from your own copy: launch the game, then use "
+            "Setup > Recover key in the app (or run "
+            "'python3 tools/find_aes_key.py --save' from a checkout)."
         )
     raw = raw.strip().removeprefix("0x").removeprefix("0X")
     try:
