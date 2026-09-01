@@ -475,6 +475,23 @@ def main():
               any(Path(v.asset_path).name.startswith("DA_Unit_")
                   and "Commander" in Path(v.asset_path).name for v in rp4.values))
 
+        gear_only = {"gear_values": "shuffle", "gear_rarity": "shuffle"}
+        rp5 = Project(name="Relics")
+        sm5 = randomizer.run(r, assets, um,
+                             randomizer.Settings(seed=5, choices=gear_only), rp5)
+        check("relics are randomized", all(v > 0 for v in sm5.values()), str(sm5))
+        gear_names = {x.name for x in assets if x.class_name == "CMGearDefinition"}
+        check("relic edits land on relic assets",
+              all(Path(v.asset_path).name in gear_names for v in rp5.values))
+
+        icons = randomizer.Settings(seed=5, choices={"gear_icons": "shuffle"})
+        art = randomizer.Settings(seed=5, choices={"card_art": "shuffle"})
+        icon_size = randomizer.estimate_bytes(r, assets, icons)
+        art_size = randomizer.estimate_bytes(r, assets, art)
+        check("the size estimate separates icons from card art",
+              0 < icon_size < art_size / 10,
+              f"icons {icon_size // 2**20} MB, card art {art_size // 2**20} MB")
+
         # Range tiers are disjoint between melee and projectile attack types, so
         # randomizing must not move a unit between the two bands.
         raw6 = rp1.build(r)

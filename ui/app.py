@@ -476,12 +476,18 @@ class MainWindow(QMainWindow):
             self.rando_note.setText("Nothing selected.")
             return
         note = f"{len(chosen)} categor{'y' if len(chosen) == 1 else 'ies'} selected."
+        if self.reader and self.assets:
+            size = randomizer.estimate_bytes(self.reader, self.assets,
+                                             self._rando_settings())
+            if size:
+                note += f"  Roughly <b>{size / 2**20:.0f} MB</b>."
+            else:
+                note += "  Around a megabyte."
         if "card_art" in chosen:
-            note += ("  <b>Card art shuffling copies the images themselves</b>, "
-                     "because pointing a card at another card's art needs a "
-                     "reference change that is not supported yet. That takes the "
-                     "mod from roughly a megabyte to about a gigabyte, and makes "
-                     "the build take minutes.")
+            note += ("  Swapping images copies them, because pointing a card at "
+                     "another card's art needs a reference change that is not "
+                     "supported yet, so card art alone makes the build take "
+                     "minutes.")
         self.rando_note.setText(note)
 
     def _rando_generate(self):

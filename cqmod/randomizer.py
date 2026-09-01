@@ -76,6 +76,17 @@ CATEGORIES = [
     Category("effect_values", "Card effect numbers",
              "Rerolls the numbers inside card effects, such as how many cards are "
              "drawn or how much damage is dealt."),
+    Category("gear_values", "Relic effect numbers",
+             "Rerolls the numbers inside relic effects, such as how much of a "
+             "resource is granted or how many times an effect triggers."),
+    Category("gear_rarity", "Relic rarity",
+             "Shuffles how rare each relic is, which changes what turns up in "
+             "shops and rewards.",
+             (SHUFFLE,)),
+    Category("gear_icons", "Relic icons",
+             "Swaps relic icons between relics. Cosmetic, and far cheaper than "
+             "shuffling card art because the icons are small.",
+             (SHUFFLE,)),
     Category("starting_decks", "Commander starting decks",
              "Replaces each commander's ten starting cards with cards drawn from "
              "the whole pool.",
@@ -121,6 +132,36 @@ class Settings:
             str: The chosen mode, or ``off``.
         """
         return self.choices.get(key, OFF)
+
+
+def estimate_bytes(reader, assets, settings: Settings) -> int:
+    """Roughly how large a mod these settings would produce.
+
+    Image categories dominate by orders of magnitude, because swapping an image
+    copies it rather than repointing a reference. Everything else edits a few
+    bytes of assets that are themselves small, so only the images are counted.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+        assets (list): The catalog.
+        settings (Settings): The settings to estimate.
+
+    Returns:
+        int: Approximate uncompressed size in bytes.
+    """
+    total = 0
+    groups = []
+    if settings.mode("card_art") != OFF:
+        groups.append([a for a in assets if a.class_name.startswith("CMCardData")])
+    if settings.mode("gear_icons") != OFF:
+        groups.append([a for a in assets if a.class_name == "CMGearDefinition"])
+    for group in groups:
+        for path in {a.texture for a in group if a.texture}:
+            for ext in (".uasset", ".uexp", ".ubulk"):
+                entry = reader.entries.get(path + ext)
+                if entry:
+                    total += entry.uncompressed_size
+    return total
 
 
 def _rng(settings: Settings, key: str) -> random.Random:
@@ -290,6 +331,26 @@ def run(reader, assets, um, settings: Settings, project) -> dict:
         summary["effect_values"] = _apply(project, _rng(settings, "effect_values"),
                                           mode, found, settings, low=1)
 
+    gears = sorted((a for a in assets if a.class_name == "CMGearDefinition"),
+                   key=lambda a: a.name)
+
+    mode = settings.mode("gear_values")
+    if mode != OFF:
+        summary["gear_values"] = _apply(project, _rng(settings, "gear_values"),
+                                        mode, _effect_numbers(reader, um, gears),
+                                        settings, low=1)
+
+    mode = settings.mode("gear_rarity")
+    if mode != OFF:
+        found = _collect(reader, um, gears, "Rarity")
+        summary["gear_rarity"] = _apply(project, _rng(settings, "gear_rarity"),
+                                        SHUFFLE, found, settings)
+
+    mode = settings.mode("gear_icons")
+    if mode != OFF:
+        summary["gear_icons"] = _shuffle_textures(
+            _rng(settings, "gear_icons"), gears, project)
+
     mode = settings.mode("card_art")
     if mode != OFF:
         summary["card_art"] = _shuffle_art(_rng(settings, "card_art"), assets, project)
@@ -337,8 +398,8 @@ def _collect_grouped(reader, um, assets, prop_name):
     return groups
 
 
-def _effect_numbers(reader, um, cards):
-    """Collect the numeric knobs inside card effects.
+def _effect_numbers(reader, um, owners):
+    """Collect the numeric knobs inside effect objects.
 
     Only integer properties on effect exports are taken, and only small positive
     ones. Large values are identifiers or bitmasks rather than quantities, and
@@ -347,13 +408,13 @@ def _effect_numbers(reader, um, cards):
     Args:
         reader (cqmod.pak.PakReader): An open archive.
         um (cqmod.usmap.Usmap): Property schema.
-        cards (list): Card assets.
+        owners (list): Assets whose effect exports should be searched.
 
     Returns:
         list[tuple]: ``(asset, offset, value, size)`` per occurrence.
     """
     found = []
-    for a in cards:
+    for a in owners:
         try:
             body = reader.read(a.uexp)
         except Exception:
@@ -368,19 +429,18 @@ def _effect_numbers(reader, um, cards):
     return found
 
 
-def _shuffle_art(rng, assets, project):
-    """Swap card illustrations between cards.
+def _shuffle_textures(rng, owners, project):
+    """Swap the images of a set of assets between them.
 
     Args:
         rng (random.Random): Generator for this category.
-        assets (list): The catalog.
+        owners (list): Assets whose textures should be exchanged.
         project (cqmod.project.Project): Project to stage edits into.
 
     Returns:
-        int: How many cards had their art changed.
+        int: How many assets had their image changed.
     """
-    arts = sorted({a.texture for a in assets
-                   if a.class_name.startswith("CMCardData") and a.texture})
+    arts = sorted({a.texture for a in owners if a.texture})
     if len(arts) < 2:
         return 0
     shuffled = list(arts)
@@ -392,6 +452,21 @@ def _shuffle_art(rng, assets, project):
         project.set_texture(target, source_texture=source)
         n += 1
     return n
+
+
+def _shuffle_art(rng, assets, project):
+    """Swap card illustrations between cards.
+
+    Args:
+        rng (random.Random): Generator for this category.
+        assets (list): The catalog.
+        project (cqmod.project.Project): Project to stage edits into.
+
+    Returns:
+        int: How many cards had their art changed.
+    """
+    return _shuffle_textures(
+        rng, [a for a in assets if a.class_name.startswith("CMCardData")], project)
 
 
 def _random_decks(reader, rng, assets, project):

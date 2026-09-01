@@ -36,9 +36,16 @@ should be less reasonable.
 | Unit attack range | shuffle, random | `AttackRangeStatus`, banded (see below) |
 | Unit attack speed | shuffle, random | `AttackCooltimeStatus`, banded |
 | Card effect numbers | shuffle, random | integers inside card effects, such as cards drawn or damage dealt |
+| Relic effect numbers | shuffle, random | the same for relics: resource amounts, trigger counts, buff values |
+| Relic rarity | shuffle | changes what turns up in shops and rewards |
+| Relic icons | shuffle | cosmetic, and cheap at about 34 MB |
 | Commander starting decks | random | ten cards drawn from the whole pool |
 | Unit tags | shuffle | gameplay tags redistributed between units that have them |
-| Card art | shuffle | see the size warning below |
+| Card art | shuffle | cosmetic, but see the size warning below |
+
+Relics are `CMGearDefinition` in the data. Their effects are separate exports
+just as cards' are, so the same numeric knobs are reachable: 151 relics carry
+`ResourceAmount`, `TriggerCount`, `BuffValue`, `HpAmmount` and similar.
 
 ## Range and attack speed are banded
 
@@ -62,12 +69,18 @@ Commander units are excluded unless **Include commanders** is ticked. Rolling a
 commander's health down to a few points makes a run unwinnable rather than
 interesting. Commander *cards* are ordinary cards and are randomized normally.
 
-## Card art costs a gigabyte
+## Image categories cost space
 
-Art shuffling copies the images themselves, because pointing a card at another
-card's illustration would need a reference change that is not supported yet.
-That takes a typical run from about **1 MB to about 1 GB**, and the build from a
-second and a half to minutes. It is off by default and the tab says so before
-you generate.
+Swapping an image copies it, because pointing a card at another card's
+illustration would need a reference change that is not supported yet. The two
+image categories are therefore very different in cost:
 
-Everything else together is around 1,000 edits and builds in a second or two.
+| category | added size |
+|---|---|
+| Relic icons | about 34 MB |
+| Card art | about 1 GB |
+
+The tab estimates this live as you tick categories, so the cost is visible
+before you generate rather than after the build. Card art is off by default.
+
+Everything else together is around 1,200 edits and builds in a second or two.
