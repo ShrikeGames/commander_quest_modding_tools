@@ -56,7 +56,7 @@ Makefile steps so the vendored sources stay pristine:
 
 1. Cut `kraken.cpp` before `typedef int WINAPI OodLZ_CompressFunc(`. Everything
    after it is the Windows CLI, DLL loading and `main`.
-2. Replace `stdafx.h` with `ooz_linux.h`, which supplies the typedefs and shims
+2. Replace `stdafx.h` with `ooz_compat.h`, which supplies the typedefs and shims
    `_BitScanReverse`, `_BitScanForward` and the `_byteswap_*` builtins.
 
 **Do not define `_rotl`.** GCC's `ia32intrin.h` already provides it, and

@@ -47,8 +47,35 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: Record the toolchain
+        shell: bash
+        run: |
+          echo "PATH=$PATH"
+          which gcc g++ || true
+          gcc --version || true
+          g++ --version || true
+
+      # The compiler output is copied into the run summary on failure, because
+      # a build that breaks only on one platform is otherwise invisible to
+      # anyone who cannot open the raw logs.
       - name: Build the native decoder and key scanner
-        run: python tools/build_native.py
+        id: native
+        shell: bash
+        run: |
+          set -o pipefail
+          python tools/build_native.py 2>&1 | tee native-build.log
+
+      - name: Report a native build failure
+        if: failure() && steps.native.conclusion == 'failure'
+        shell: bash
+        run: |
+          {
+            echo "## Native build failed on ${{ matrix.label }}"
+            echo ''
+            echo '```'
+            tail -80 native-build.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Package the application
         run: pyinstaller --noconfirm packaging/cqmod.spec

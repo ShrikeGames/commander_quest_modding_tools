@@ -238,3 +238,6 @@ mods/
 # Locally built native pieces and packaged output
 native/
 dist_app/
+
+# Logs pulled from CI for debugging
+logs/

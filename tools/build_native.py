@@ -72,7 +72,7 @@ def prepare_ooz_sources() -> list:
             at = src.find(marker)
             if at >= 0:
                 src = src[:at]
-        src = src.replace('#include "stdafx.h"', '#include "ooz_linux.h"')
+        src = src.replace('#include "stdafx.h"', '#include "ooz_compat.h"')
         out = OOZ / f"{stem}_lib.cpp"
         out.write_text(src)
         generated.append(out)
