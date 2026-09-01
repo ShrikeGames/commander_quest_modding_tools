@@ -16,6 +16,7 @@ rather than a self-describing stream. See :mod:`cqmod.unversioned`.
 """
 from __future__ import annotations
 import struct
+import zlib
 from dataclasses import dataclass, field
 
 PACKAGE_MAGIC = 0x9E2A83C1
@@ -261,6 +262,65 @@ def _skip_fstring(data: bytes, o: int) -> int:
     return o + 4 + (n if n >= 0 else -n * 2)
 
 
+_STRIHASH_TABLE = []
+"""Unreal's ``CRCTable_DEPRECATED``, built once on first use.
+
+A CRC-32 table for polynomial 0x04C11DB7 in most-significant-bit-first form.
+Unreal then drives it with a right-shifting update, which is unusual but is
+what ``FCrc::Strihash_DEPRECATED`` does, and the table it produces starts
+0x00000000, 0x04C11DB7, 0x09823B6E as the engine's own source does.
+"""
+
+
+def _strihash_table():
+    """Build the deprecated CRC table on first use.
+
+    Returns:
+        list[int]: 256 entries.
+    """
+    if not _STRIHASH_TABLE:
+        for i in range(256):
+            c = i << 24
+            for _ in range(8):
+                c = (((c << 1) ^ 0x04C11DB7) if c & 0x80000000 else (c << 1)) \
+                    & 0xFFFFFFFF
+            _STRIHASH_TABLE.append(c)
+    return _STRIHASH_TABLE
+
+
+def name_hashes(name: str):
+    """Compute the two hashes stored after a name in the name table.
+
+    Every entry carries a case-insensitive hash and a case-preserving one, and
+    the engine uses them to place the name in its pool. Writing zeroes there
+    produces a package that parses perfectly and that Unreal rejects on load.
+
+    The case-insensitive hash runs over the name's *stored* encoding, one byte
+    per character for an ANSI entry and UTF-16 for a wide one, which is why a
+    Korean name hashes differently from the way its Latin neighbours do. The
+    case-preserving hash always runs over the characters widened to four bytes.
+
+    Both were recovered by reproducing the 28,076 name entries the game ships,
+    which they match exactly.
+
+    Args:
+        name (str): The name as it will be stored.
+
+    Returns:
+        tuple[int, int]: The case-insensitive and case-preserving hashes, each
+        16 bits.
+    """
+    wide = any(ord(c) > 127 for c in name)
+    upper = name.upper()
+    raw = (upper.encode("utf-16-le") if wide
+           else bytes(ord(c) & 0xFF for c in upper))
+    table = _strihash_table()
+    h = 0
+    for b in raw:
+        h = ((h >> 8) & 0x00FFFFFF) ^ table[(h ^ b) & 0xFF]
+    return h & 0xFFFF, zlib.crc32(name.encode("utf-32-le")) & 0xFFFF
+
+
 def _summary_end(data: bytes):
     """Parse the summary far enough to locate every field that can shift.
 
@@ -322,6 +382,7 @@ def _summary_end(data: bytes):
     (chunk_ids,) = struct.unpack_from("<i", data, o); o += 4 + 4 * chunk_ids
     o += 4                                          # PreloadDependencyCount
     pairs.append(o); o += 4                         # PreloadDependencyOffset
+    names_referenced_pos = o
     o += 4                                          # NamesReferencedFromExportDataCount
     o += 8                                          # PayloadTocOffset (int64, often -1)
     pairs.append(o); o += 4                         # DataResourceOffset
@@ -331,6 +392,7 @@ def _summary_end(data: bytes):
             f"summary parse ended at {o} but the name table starts at {name_offset}")
     return {
         "end": o,
+        "names_referenced_pos": names_referenced_pos,
         "total_header_pos": total_header_pos,
         "name_count_pos": name_count_pos,
         "name_count": name_count,
@@ -378,7 +440,7 @@ def add_name(data: bytes, new_name: str) -> bytes:
     else:
         entry = (struct.pack("<i", len(new_name) + 1)
                  + new_name.encode("ascii") + b"\0")
-    entry += b"\0" * 4                              # the two name hashes
+    entry += struct.pack("<HH", *name_hashes(new_name))
     delta = len(entry)
 
     # The name table ends where the section after it begins, which is the
@@ -389,6 +451,12 @@ def add_name(data: bytes, new_name: str) -> bytes:
     out = bytearray(data[:table_end]) + entry + data[table_end:]
 
     struct.pack_into("<i", out, s["name_count_pos"], s["name_count"] + 1)
+    # The summary declares how many leading names export data is allowed to
+    # reference, and the cooker keeps those first. A name appended at the end
+    # falls outside that range, so the engine refuses the package with
+    # "Corrupt data found" the moment a tag or row handle points at it.
+    # Widening the range to the whole table keeps every name reachable.
+    struct.pack_into("<i", out, s["names_referenced_pos"], s["name_count"] + 1)
     struct.pack_into("<i", out, s["total_header_pos"],
                      struct.unpack_from("<i", data, s["total_header_pos"])[0] + delta)
     for p in s["shift32"]:

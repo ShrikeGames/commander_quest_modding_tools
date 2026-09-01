@@ -790,6 +790,72 @@ def main():
     check("every data asset survives a name table insertion", bad == 0,
           f"{ok}/{len(data_assets)}")
 
+    # A name entry carries two hashes the engine uses to place it in its pool.
+    # Writing zeroes there produces a package that parses perfectly and that
+    # Unreal rejects on load, so they are checked against the game's own.
+    hashed = wrong = 0
+    for path in data_assets[:150]:
+        raw5 = r.read(path)
+        pkg5 = uasset.parse(raw5)
+        s5 = uasset._summary_end(raw5)
+        at = s5["name_offset"]
+        for nm5 in pkg5.names:
+            length = struct.unpack_from("<i", raw5, at)[0]
+            at += 4 + (abs(length) * 2 if length < 0 else length)
+            pair = struct.unpack_from("<HH", raw5, at)
+            at += 4
+            hashed += 1
+            wrong += uasset.name_hashes(nm5) != pair
+    check("name hashes match the ones the game ships", wrong == 0,
+          f"{hashed - wrong}/{hashed}")
+    check("a wide name hashes differently from its low bytes",
+          uasset.name_hashes("\uc0c8 \ud568\uc218")[0]
+          != uasset.name_hashes("\u00c8 \u0068\u0018")[0])
+
+    # Export data may only reference names inside the range the summary
+    # declares. A name appended past it loads as corrupt data.
+    probe5 = r.read(data_assets[0])
+    grown5 = uasset.add_name(probe5, "CQMOD.RangeCheck")
+    after5 = uasset.parse(grown5)
+    limit = struct.unpack_from(
+        "<i", grown5, uasset._summary_end(grown5)["names_referenced_pos"])[0]
+    check("an inserted name is inside the export-data name range",
+          len(after5.names) - 1 < limit, f"index {len(after5.names)-1}, limit {limit}")
+    # Walk to the entry just added and read the hashes actually written.
+    at5 = uasset._summary_end(grown5)["name_offset"]
+    written = None
+    for nm5 in after5.names:
+        length = struct.unpack_from("<i", grown5, at5)[0]
+        at5 += 4 + (abs(length) * 2 if length < 0 else length)
+        written = struct.unpack_from("<HH", grown5, at5)
+        at5 += 4
+    check("the inserted name carries the right hashes",
+          written == uasset.name_hashes("CQMOD.RangeCheck"),
+          f"wrote {written}, expected {uasset.name_hashes('CQMOD.RangeCheck')}")
+
+    # Every name the game's own export data references sits inside the range,
+    # which is what makes it a rule rather than a coincidence.
+    inside = beyond = 0
+    for x6 in assets[:200]:
+        try:
+            raw6 = r.read(x6.uasset)
+            body6 = r.read(x6.uexp)
+        except Exception:
+            continue
+        cap = struct.unpack_from(
+            "<i", raw6, uasset._summary_end(raw6)["names_referenced_pos"])[0]
+        for e6 in x6.exports:
+            for f6 in um.place(e6, body6):
+                if not um.is_tag_container(e6, f6.index):
+                    continue
+                for _, idx6 in um.tags(f6, body6):
+                    if idx6 < cap:
+                        inside += 1
+                    else:
+                        beyond += 1
+    check("the game never references a name beyond the declared range",
+          beyond == 0 and inside > 0, f"{inside} inside, {beyond} beyond")
+
     arch2 = by.get("DA_Unit_Human_Archer")
     if arch2 and um:
         pay = r.read(arch2.uexp)
