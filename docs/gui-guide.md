@@ -79,5 +79,12 @@ disable each one. See [mod manager](mod-manager.md).
 - **Build & Install Mod**. Compiles everything into `ZZZ_<name>_P.pak`, writes
   it to the staging folder, enables it, and reports what was written.
 
+The build report counts the edits by kind and puts the log itself behind
+**Show Details**, in a pane that scrolls. That pane exists because the log has
+a line per edit: randomizing every category writes over four thousand of them,
+and a message box sized to fit that text would be around fifty screens tall
+with no way to scroll it. Logs longer than 2,000 lines are cut off with a note
+saying how many were left out.
+
 Restart the game to load a mod. To turn one off, untick it on the Mods tab;
 to remove it entirely, delete it there. Nothing else on disk is ever modified.

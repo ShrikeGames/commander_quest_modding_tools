@@ -27,6 +27,77 @@ from cqmod.project import Project
 
 ACCENT = "#B03A0B"
 
+DETAIL_LINE_LIMIT = 2000
+"""How many log lines a report will show before it starts summarising."""
+
+
+def report(parent, title, summary, details=(), icon=QMessageBox.Information):
+    """Show a message whose detail can run to thousands of lines.
+
+    A plain message box grows to fit its text, so handing one a build log with
+    an edit per line produces a dialog taller than the screen with no way to
+    scroll it. Randomizing everything stages a few thousand edits, which is
+    exactly when the log is worth reading, so the detail goes in the collapsible
+    pane instead. That pane scrolls and keeps its own size, and the box itself
+    stays as small as the summary.
+
+    Args:
+        parent (QWidget): Dialog parent.
+        title (str): Window title.
+        summary (str): The short version, always visible.
+        details (Iterable[str]): Lines shown under "Show Details".
+        icon (QMessageBox.Icon): Which icon to use.
+
+    Returns:
+        None
+    """
+    lines = list(details)
+    box = QMessageBox(parent)
+    box.setIcon(icon)
+    box.setWindowTitle(title)
+    box.setText(summary)
+    if lines:
+        if len(lines) > DETAIL_LINE_LIMIT:
+            hidden = len(lines) - DETAIL_LINE_LIMIT
+            lines = lines[:DETAIL_LINE_LIMIT] + [
+                "", f"... and {hidden:,} more lines."]
+        box.setDetailedText("\n".join(lines))
+        # The pane Qt builds for detailed text is small and wraps, which turns
+        # a log of one edit per line into an unreadable block. Give it room and
+        # let it scroll sideways instead, so each edit stays on its own line.
+        pane = box.findChild(QTextEdit)
+        if pane is not None:
+            pane.setLineWrapMode(QTextEdit.NoWrap)
+            pane.setMinimumSize(720, 380)
+    box.exec()
+
+
+def summarise_log(lines):
+    """Count a build log by the kind of edit each line records.
+
+    Args:
+        lines (Iterable[str]): The log :meth:`cqmod.project.Project.build`
+            produced.
+
+    Returns:
+        str: One line per kind of edit, or an empty string for a log that
+        records no edits.
+    """
+    kinds = {"value": "values", "ref": "references", "name": "names",
+             "text": "text", "art": "art", "add": "added properties"}
+    counts = {}
+    for line in lines:
+        parts = line.split()
+        if not (line.startswith("  ") and parts and parts[0] in kinds):
+            continue
+        # A name edit logs twice when the asset has to grow its name table,
+        # once for the insertion and once for the write. Only the write is an
+        # edit, so the insertion line is skipped to keep the count honest.
+        if parts[0] == "name" and "+=" in parts:
+            continue
+        counts[kinds[parts[0]]] = counts.get(kinds[parts[0]], 0) + 1
+    return "\n".join(f"{n:,} {kind}" for kind, n in sorted(counts.items()))
+
 
 class ArtView(QLabel):
     """A label that fits its image to whatever room it is given.
@@ -513,13 +584,15 @@ class MainWindow(QMainWindow):
         self._refresh_edits()
         if self.current:
             self._select_asset()
-        lines = "\n".join(
-            f"{randomizer.CATEGORY_BY_KEY[k].label}: {v} change(s)"
-            for k, v in summary.items())
-        QMessageBox.information(
-            self, "Randomized",
-            f"Seed {settings.seed}\n\n{lines}\n\n"
-            "Review them on the Pending edits tab, then Build & Install.")
+        lines = [f"{randomizer.CATEGORY_BY_KEY[k].label}: {v:,} change(s)"
+                 for k, v in summary.items()]
+        report(self, "Randomized",
+               f"Seed {settings.seed}\n\n"
+               f"{sum(summary.values()):,} changes across "
+               f"{len(summary)} categor"
+               f"{'y' if len(summary) == 1 else 'ies'}.\n\n"
+               "Review them on the Pending edits tab, then Build & Install.",
+               lines)
 
     def _mods_panel(self):
         """Build the mod manager tab.
@@ -1426,14 +1499,16 @@ class MainWindow(QMainWindow):
             self.mods.enable(info)
             log.append(f"enabled: {info.path}")
         except Exception as e:
-            QMessageBox.critical(self, "Build failed",
-                                 f"{e}\n\n" + "\n".join(log))
+            report(self, "Build failed", str(e), log, QMessageBox.Critical)
             return
         self._refresh_mods()
-        QMessageBox.information(
-            self, "Mod installed",
-            "\n".join(log) + "\n\nRestart the game to load it.\n"
-            "Use the Mods tab to disable it without deleting it.")
+        counted = summarise_log(log)
+        report(self, "Mod installed",
+               f"Installed {dest.name} ({len(raw):,} bytes).\n\n"
+               + (counted + "\n\n" if counted else "")
+               + "Restart the game to load it.\n"
+               "Use the Mods tab to disable it without deleting it.",
+               log)
 
 
 def main():
