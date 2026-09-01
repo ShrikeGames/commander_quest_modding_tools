@@ -155,52 +155,54 @@ jobs:
       # actions/checkout creates a lightweight tag pointing at the commit, so
       # git's own %(contents) yields the commit message instead of the
       # annotation, which is a silent wrong answer rather than an error.
-      - name: Take the release notes from the tag
-        id: notes
-        shell: bash
+      - name: Build the release body from the tag
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
           set -euo pipefail
           sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$GITHUB_REF_NAME" \
                   --jq 'select(.object.type == "tag") | .object.sha' || true)
           if [ -n "$sha" ]; then
-            # Drop the subject line: GitHub already titles the release with it.
             gh api "repos/$GITHUB_REPOSITORY/git/tags/$sha" --jq '.message' \
-              | tail -n +2 | sed '/./,$!d' > notes.md
+              | tail -n +2 | sed '/./,$!d' > body.md
           else
-            echo "tag $GITHUB_REF_NAME is not annotated; no notes" >&2
-            : > notes.md
+            echo "::warning::tag $GITHUB_REF_NAME is not annotated; no notes"
+            : > body.md
           fi
-          {
-            echo "text<<CQMOD_NOTES_EOF"
-            cat notes.md
-            echo "CQMOD_NOTES_EOF"
-          } >> "$GITHUB_OUTPUT"
-          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+          cat >> body.md <<'INSTALL'
+
+          ## Installing
+
+          Download the archive for your platform, unpack it anywhere, and run
+          **CommanderQuestModTool**. Nothing is installed and no Python,
+          compiler or other setup is needed.
+
+          On first launch the tool asks where Commander Quest is, which it
+          usually works out on its own, and for the archive key. The game builds
+          that key while it runs, so start the game, wait for the main menu, and
+          press **Recover key from the running game**. It is the same key for
+          everyone on a given version and is only needed again if a patch
+          changes it.
+
+          Reading the game's memory for that step needs permission: run the tool
+          as administrator on Windows, or on Linux run
+          `sudo sysctl -w kernel.yama.ptrace_scope=0` once.
+          INSTALL
+          cat body.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/*
           draft: false
-          generate_release_notes: true
-          body: |
-            ${{ steps.notes.outputs.text }}
+          body_path: body.md
 
-            ## Installing
-
-            Download the archive for your platform, unpack it anywhere, and run
-            **CommanderQuestModTool**. Nothing is installed and no Python,
-            compiler or other setup is needed.
-
-            On first launch the tool asks where Commander Quest is (it usually
-            finds it on its own) and for the archive key. The game builds that
-            key while it runs, so start the game, wait for the main menu, and
-            press **Recover key from the running game**. It is the same key for
-            everyone on a given version and is only needed again if a patch
-            changes it.
-
-            Linux users may need to allow reading the game's memory for that one
-            step: `sudo sysctl -w kernel.yama.ptrace_scope=0`. Windows users may
-            need to run the tool as administrator for it.
+      # softprops leaves an existing release's body alone, so re-running a tag
+      # would keep whatever was published the first time. Setting it explicitly
+      # means the notes always match the tag, however often the tag is rebuilt.
+      - name: Make the published body match the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release edit "$GITHUB_REF_NAME" --notes-file body.md
