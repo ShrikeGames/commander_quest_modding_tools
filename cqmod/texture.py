@@ -320,11 +320,19 @@ def to_image(tex: Texture, ubulk: bytes = b""):
     return Image.open(io.BytesIO(hdr + payload)).convert("RGBA")
 
 
-DEFAULT_TEXTURE = "Engine/Content/EngineResources/DefaultTexture"
-"""Unreal's own placeholder art, the grey checkerboard it falls back to.
+PLACEHOLDER_GRID = "Engine/Content/EngineMaterials/DefaultWhiteGrid"
+"""Unreal's grid, the white and grey checkerboard people picture.
 
-The game ships the engine content that holds it, and refers to it as
-``/Engine/EngineResources/DefaultTexture`` in its own import tables.
+Not to be confused with ``DefaultTexture``, which despite the name is a pale
+bubbled rock pattern rather than a grid. Both ship with the game as part of the
+engine content.
+"""
+
+DEFAULT_TEXTURE = "Engine/Content/EngineResources/DefaultTexture"
+"""The texture Unreal substitutes when art is missing.
+
+It looks like pale rock or bubbles, not a grid. Use :data:`PLACEHOLDER_GRID`
+for the checkerboard.
 """
 
 
