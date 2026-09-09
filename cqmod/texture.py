@@ -320,6 +320,44 @@ def to_image(tex: Texture, ubulk: bytes = b""):
     return Image.open(io.BytesIO(hdr + payload)).convert("RGBA")
 
 
+DEFAULT_TEXTURE = "Engine/Content/EngineResources/DefaultTexture"
+"""Unreal's own placeholder art, the grey checkerboard it falls back to.
+
+The game ships the engine content that holds it, and refers to it as
+``/Engine/EngineResources/DefaultTexture`` in its own import tables.
+"""
+
+
+def all_textures(reader) -> list:
+    """List every asset in an archive that is a texture.
+
+    There is no index of them, and an asset's class is not in its file name, so
+    every payload is tried and the ones that parse as a texture are kept. That
+    also filters out the formats this module cannot rewrite, such as cube maps,
+    which is what a caller wanting to replace them all actually needs.
+
+    Args:
+        reader (cqmod.pak.PakReader): An open archive.
+
+    Returns:
+        list[str]: Pak paths without extension, in sorted order.
+    """
+    files = set(reader.files())
+    out = []
+    for name in sorted(files):
+        if not name.endswith(".uexp"):
+            continue
+        base = name[:-len(".uexp")]
+        bulk_path = base + ".ubulk"
+        try:
+            bulk = reader.read(bulk_path) if bulk_path in files else b""
+            parse(reader.read(name), bulk)
+        except Exception:
+            continue
+        out.append(base)
+    return out
+
+
 def to_png_bytes(tex: Texture):
     """Decode a texture into an image.
 
